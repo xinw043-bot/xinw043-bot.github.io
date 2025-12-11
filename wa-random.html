@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Jump</title>
+    <script>
+        const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
+        const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
+        window.onload = function() {
+            window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+        };
+    </script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .loading {
+            color: #333;
+            font-size: 16px;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">Redirecting to WhatsApp support...</div>
+</body>
+</html>
