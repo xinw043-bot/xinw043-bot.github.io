@@ -4,37 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Jump</title>
-    <script>
-        const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
-        const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
-        // 已填好你的Vercel域名，无需修改
-        const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
-
-        // 记录跳转信息并跳转
-        async function logAndRedirect() {
-            try {
-                // 发送日志到Vercel后端
-                await fetch(apiUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        phoneNumber: randomNumber,
-                        redirectTime: new Date().toISOString()
-                    })
-                });
-            } catch (err) {
-                // 记录失败也不影响跳转
-                console.log("日志记录失败:", err);
-            } finally {
-                // 跳转到WhatsApp
-                window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
-            }
-        }
-
-        window.onload = logAndRedirect;
-    </script>
     <style>
         body {
             margin: 0;
@@ -52,5 +21,56 @@
 </head>
 <body>
     <div class="loading">Redirecting to WhatsApp support...</div>
+
+    <script>
+        // 1. 基础配置（和之前一致）
+        const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
+        const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
+        const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
+
+        // 2. 构建日志数据
+        const logData = {
+            phoneNumber: randomNumber,
+            redirectTime: new Date().toISOString(),
+            test: "手动测试数据" // 加测试字段，方便确认
+        };
+
+        // 3. 强制发送日志（核心：解决请求被取消问题）
+        const sendLog = async () => {
+            try {
+                console.log("开始发送日志，数据：", logData);
+                const response = await fetch(apiUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "*/*" // 兼容Vercel的响应格式
+                    },
+                    body: JSON.stringify(logData),
+                    keepalive: true, // 关键：页面跳转后仍发送
+                    mode: "cors", // 允许跨域（Vercel和GitHub Pages跨域）
+                    cache: "no-cache" // 禁用缓存，确保实时发送
+                });
+
+                // 打印响应结果（方便调试）
+                const responseText = await response.text();
+                console.log("日志发送成功，后端响应：", responseText);
+                
+                // 延迟2秒跳转（确保请求完全完成）
+                setTimeout(() => {
+                    window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+                }, 2000);
+
+            } catch (error) {
+                console.error("日志发送失败，错误详情：", error);
+                // 失败也跳转，不影响用户
+                setTimeout(() => {
+                    window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+                }, 2000);
+            }
+        };
+
+        // 4. 页面加载后立即执行
+        window.onload = sendLog;
+    </script>
 </body>
 </html>
