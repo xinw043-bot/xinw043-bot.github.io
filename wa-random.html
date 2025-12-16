@@ -7,9 +7,33 @@
     <script>
         const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
         const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
-        window.onload = function() {
-            window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
-        };
+        // 已填好你的Vercel域名，无需修改
+        const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
+
+        // 记录跳转信息并跳转
+        async function logAndRedirect() {
+            try {
+                // 发送日志到Vercel后端
+                await fetch(apiUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        phoneNumber: randomNumber,
+                        redirectTime: new Date().toISOString()
+                    })
+                });
+            } catch (err) {
+                // 记录失败也不影响跳转
+                console.log("日志记录失败:", err);
+            } finally {
+                // 跳转到WhatsApp
+                window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+            }
+        }
+
+        window.onload = logAndRedirect;
     </script>
     <style>
         body {
