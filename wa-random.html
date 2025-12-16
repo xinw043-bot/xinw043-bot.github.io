@@ -25,51 +25,34 @@
     <div class="loading">Redirecting to WhatsApp support...</div>
 
     <script>
-        // 1. 基础配置
-        const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
-        const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
-        const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
+    const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
+    const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
+    // 建议直接用相对路径（如果都在同一个域名部署）或完整 Vercel 路径
+    const apiUrl = "/api/log"; 
 
-        // 2. 核心：同步发送日志（避免异步被拦截）+ 强制不取消请求
-        function sendLogSync() {
-            // 创建 XMLHttpRequest（比 fetch 更稳定，避免异步拦截）
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", apiUrl, false); // false = 同步请求（等发送完再跳转）
-            xhr.setRequestHeader("Content-Type", "application/json");
-            
-            // 监听请求状态（调试用）
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    console.log("api/log 请求状态：", xhr.status);
-                    console.log("api/log 响应：", xhr.responseText);
-                }
-            };
-
-            // 构造日志数据
-            const logData = JSON.stringify({
-                phoneNumber: randomNumber,
-                redirectTime: new Date().toISOString()
-            });
-
-            // 发送请求（同步，必须等发送完才执行后续代码）
-            try {
-                xhr.send(logData);
-                console.log("api/log 请求已发送，数据：", logData);
-            } catch (err) {
-                console.error("api/log 发送失败：", err);
-            }
-        }
-
-        // 3. 执行逻辑：先发日志，再跳转
-        // 页面加载后立即执行
-        window.onload = function() {
-            // 第一步：强制发送日志（同步）
-            sendLogSync();
-            // 第二步：延迟跳转（确保请求完全完成）
-            setTimeout(() => {
-                window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
-            }, 1000);
+    window.onload = function() {
+        const logData = {
+            phoneNumber: randomNumber,
+            redirectTime: new Date().toLocaleString()
         };
-    </script>
+
+        // 使用 fetch 配合 keepalive: true
+        // 这样即使页面马上跳转，浏览器也会在后台把这笔请求发完
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(logData),
+            keepalive: true 
+        }).then(() => {
+            console.log("日志已发送");
+        }).catch(err => console.error("发送失败", err));
+
+        // 缩短延迟，1秒足够 fetch 发起请求
+        setTimeout(() => {
+            window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+        }, 800);
+    };
+</script>
 </body>
 </html>
+
