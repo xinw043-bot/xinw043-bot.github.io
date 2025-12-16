@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>强制测试 api/log 请求</h1>
+    <button onclick="sendLog()">点击发送日志</button>
+
+    <script>
+        // 直接写死 apiUrl，避免变量问题
+        const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
+
+        function sendLog() {
+            // 用最原始的 XMLHttpRequest（确保兼容性）
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", apiUrl, true); // 异步请求（调试更直观）
+            xhr.setRequestHeader("Content-Type", "application/json");
+            
+            // 监听请求完成
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    alert("api/log 请求成功！状态码：" + xhr.status);
+                } else {
+                    alert("api/log 请求失败！状态码：" + xhr.status);
+                }
+            };
+
+            // 构造简单日志数据
+            const logData = JSON.stringify({ test: "手动测试" });
+            xhr.send(logData);
+        }
+    </script>
+</body>
+</html>
