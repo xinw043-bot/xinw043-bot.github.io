@@ -5,64 +5,83 @@ const app = express();
 
 app.use(bodyParser.json());
 
-// 1. 初始化 Supabase
-// (记得在 Vercel 后台配置环境变量 SUPABASE_URL 和 SUPABASE_KEY)
+// --- 核心修改：安全初始化 Supabase ---
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+let supabase = null;
 
-// 2. 跨域处理（保留你原有的设置，确保 github.io 能访问）
+// 检查变量是否存在，防止启动崩溃
+if (supabaseUrl && supabaseKey) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+        console.log("✅ Supabase 客户端初始化成功");
+    } catch (e) {
+        console.error("❌ Supabase 初始化失败:", e.message);
+    }
+} else {
+    console.error("⚠️ 警告：未检测到环境变量 SUPABASE_URL 或 SUPABASE_KEY。数据库功能将不可用。");
+}
+// -----------------------------------
+
+// 跨域处理（保留原样）
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     next();
 });
 
-// 3. POST: 接收日志并写入 Supabase
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
         
-        // 获取真实 IP
+        // 获取 IP
         const visitorIP = req.headers['x-forwarded-for'] 
             ? req.headers['x-forwarded-for'].split(',')[0] 
             : req.ip;
 
-        const userAgent = req.get('User-Agent');
+        console.log(`[收到请求] IP: ${visitorIP}, WA: ${logData.phoneNumber}`);
+
+        // 检查数据库是否这就绪
+        if (!supabase) {
+            console.error("❌ 无法写入：Supabase 未配置");
+            // 这里返回 200 是为了不让前端报错，但在后台打印错误
+            return res.status(200).send({ success: false, msg: "Server Config Error" });
+        }
 
         // 写入数据库
-        // 注意：这里表名必须和你 Supabase 里创建的表名一致 ('wa_logs')
         const { error } = await supabase
             .from('wa_logs')
             .insert({
                 phone_number: logData.phoneNumber,
                 redirect_time: logData.redirectTime,
                 ip: visitorIP,
-                user_agent: userAgent
+                user_agent: req.get('User-Agent')
             });
 
-        if (error) throw error;
+        if (error) {
+            throw error;
+        }
 
-        // 保留 Console log 方便在 Vercel 后台快速调试
-        console.log(`[DB Success] Saved log for IP: ${visitorIP}`);
-
+        console.log("✅ 数据成功写入 Supabase");
         res.status(200).send({ success: true });
+
     } catch (error) {
-        console.error('DB_ERROR:', error.message);
-        res.status(500).send({ success: false, error: error.message });
+        console.error('SERVER_ERROR:', error.message);
+        // 即使出错也返回 200，避免前端阻塞
+        res.status(200).send({ success: false });
     }
 });
 
-// 4. GET: 查看日志 (带简单密码保护)
+// 查看日志页面
 app.get('/api/logs', async (req, res) => {
-    // 简单密码验证
-    const password = req.query.pwd;
-    if (password !== '123456') { // 你可以把 123456 改成你想设的密码
-        return res.send('🔒 请输入正确的密码访问日志。例如: /api/logs?pwd=123456');
+    if (!supabase) {
+        return res.send('❌ 错误：Supabase 环境变量未配置，无法读取数据。请检查 Vercel 设置。');
     }
+    
+    // 简单密码验证
+    if (req.query.pwd !== '123456') return res.send('🔒 密码错误');
 
     try {
-        // 从 Supabase 读取最新的 50 条数据
         const { data: logs, error } = await supabase
             .from('wa_logs')
             .select('*')
@@ -70,50 +89,11 @@ app.get('/api/logs', async (req, res) => {
             .limit(50);
 
         if (error) throw error;
-
-        // 生成 HTML 表格
-        let html = `
-        <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>跳转数据监控</title>
-                <style>
-                    body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-                    h2 { text-align: center; color: #333; }
-                    table { width: 100%; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #fff; }
-                    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
-                    th { background-color: #0070f3; color: white; }
-                    tr:nth-child(even) { background-color: #f9f9f9; }
-                    .ua { font-size: 12px; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                </style>
-            </head>
-            <body>
-                <h2>WhatsApp 跳转日志 (Supabase)</h2>
-                <table>
-                    <tr>
-                        <th>时间 (UTC)</th>
-                        <th>目标号码</th>
-                        <th>访客 IP</th>
-                        <th>设备信息 (UA)</th>
-                    </tr>
-                    ${logs.map(log => `
-                    <tr>
-                        <td>${new Date(log.created_at).toLocaleString()}</td>
-                        <td>${log.phone_number}</td>
-                        <td>${log.ip}</td>
-                        <td class="ua" title="${log.user_agent}">${log.user_agent || '-'}</td>
-                    </tr>
-                    `).join('')}
-                </table>
-            </body>
-        </html>`;
         
-        res.send(html);
-
+        // 简单渲染
+        res.json(logs); // 直接返回 JSON 数据方便查看
     } catch (error) {
-        console.error('READ_ERROR:', error);
-        res.status(500).send('无法读取数据库: ' + error.message);
+        res.status(500).send('读取失败: ' + error.message);
     }
 });
 
