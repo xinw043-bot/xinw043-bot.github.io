@@ -18,59 +18,58 @@
             margin-top: 50px;
         }
     </style>
+    <!-- 关键：禁用浏览器跳转拦截（针对部分严格的浏览器） -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
 </head>
 <body>
     <div class="loading">Redirecting to WhatsApp support...</div>
 
     <script>
-        // 1. 基础配置（和之前一致）
+        // 1. 基础配置
         const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
         const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
         const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
 
-        // 2. 构建日志数据
-        const logData = {
-            phoneNumber: randomNumber,
-            redirectTime: new Date().toISOString(),
-            test: "手动测试数据" // 加测试字段，方便确认
-        };
+        // 2. 核心：同步发送日志（避免异步被拦截）+ 强制不取消请求
+        function sendLogSync() {
+            // 创建 XMLHttpRequest（比 fetch 更稳定，避免异步拦截）
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", apiUrl, false); // false = 同步请求（等发送完再跳转）
+            xhr.setRequestHeader("Content-Type", "application/json");
+            
+            // 监听请求状态（调试用）
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    console.log("api/log 请求状态：", xhr.status);
+                    console.log("api/log 响应：", xhr.responseText);
+                }
+            };
 
-        // 3. 强制发送日志（核心：解决请求被取消问题）
-        const sendLog = async () => {
+            // 构造日志数据
+            const logData = JSON.stringify({
+                phoneNumber: randomNumber,
+                redirectTime: new Date().toISOString()
+            });
+
+            // 发送请求（同步，必须等发送完才执行后续代码）
             try {
-                console.log("开始发送日志，数据：", logData);
-                const response = await fetch(apiUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "*/*" // 兼容Vercel的响应格式
-                    },
-                    body: JSON.stringify(logData),
-                    keepalive: true, // 关键：页面跳转后仍发送
-                    mode: "cors", // 允许跨域（Vercel和GitHub Pages跨域）
-                    cache: "no-cache" // 禁用缓存，确保实时发送
-                });
-
-                // 打印响应结果（方便调试）
-                const responseText = await response.text();
-                console.log("日志发送成功，后端响应：", responseText);
-                
-                // 延迟2秒跳转（确保请求完全完成）
-                setTimeout(() => {
-                    window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
-                }, 2000);
-
-            } catch (error) {
-                console.error("日志发送失败，错误详情：", error);
-                // 失败也跳转，不影响用户
-                setTimeout(() => {
-                    window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
-                }, 2000);
+                xhr.send(logData);
+                console.log("api/log 请求已发送，数据：", logData);
+            } catch (err) {
+                console.error("api/log 发送失败：", err);
             }
-        };
+        }
 
-        // 4. 页面加载后立即执行
-        window.onload = sendLog;
+        // 3. 执行逻辑：先发日志，再跳转
+        // 页面加载后立即执行
+        window.onload = function() {
+            // 第一步：强制发送日志（同步）
+            sendLogSync();
+            // 第二步：延迟跳转（确保请求完全完成）
+            setTimeout(() => {
+                window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+            }, 1000);
+        };
     </script>
 </body>
 </html>
