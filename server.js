@@ -41,28 +41,34 @@ app.post('/api/log', async (req, res) => {
         let city = req.headers['x-vercel-ip-city'] || 'Unknown';
         try { city = decodeURIComponent(city); } catch (e) {}
 
-        // ================= 防护网 V3.0 (安全版) =================
+        // ================= 防护网 V3.1 (VPN 友好版) =================
 
-        // 1. 基础关键词拦截 (这些词永远代表爬虫，不会误杀)
-        const botKeywords = ['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'ahrefs', 'pinterest'];
+        // 1. 基础关键词拦截 (这些词永远代表爬虫，不会误杀真人)
+        // 注意：移除了对城市的判断，允许 VPN 用户通过
+        const botKeywords = [
+            'bot', 'spider', 'crawl', 
+            'facebook', 'meta', 'whatsapp', 'preview', 
+            'google', 'twitter', 'slack', 'ahrefs', 'pinterest', 
+            'python', 'curl', 'wget'
+        ];
+        
         const isNamedBot = botKeywords.some(keyword => uaLower.includes(keyword));
 
-        // 2. 数据中心城市拦截 (这些城市几乎只有服务器)
-        // 即使有真人，概率极低，且真人的手机网络 IP 通常不会定位到数据中心精确地址
-        const dataCenterCities = ['Prineville', 'Boardman', 'Forest City', 'Altoona', 'Ashburn', 'Clonee', 'Luleå'];
-        const isDataCenter = dataCenterCities.some(c => city.includes(c));
-
-        // 3. 针对性拦截 Facebook 特征 (这个 'Android 10; K' 是 Meta 爬虫的独家签名)
-        // 这不是版本号，而是一个错误的型号标识，永久有效，不会误杀
+        // 2. 针对性拦截 Facebook 特征指纹
+        // Meta 的爬虫经常伪装成 Android，但型号写的是 "K"，这是绝对的破绽
         const isMetaFingerprint = ua.includes('Android 10; K');
 
-        // 判定逻辑：满足任一条件即拦截
-        // 去掉了 Chrome 版本号拦截，避免未来误杀
-        if (isNamedBot || isDataCenter || isMetaFingerprint) {
+        // 3. 拦截不存在的 Chrome 版本 (可选)
+        // 既然爬虫喜欢伪造 Chrome/138+, 我们可以拦截极度离谱的版本
+        // 但为了安全起见，这里先注释掉，只拦截上面两种最稳的
+        // const isFakeVersion = ua.includes('Chrome/13') || ua.includes('Chrome/14');
+
+        if (isNamedBot || isMetaFingerprint) {
             console.log(`🛡️ 拦截爬虫 | City: ${city} | UA: ${ua.substring(0, 30)}...`);
+            // 返回成功，骗过爬虫
             return res.status(200).send({ success: true, skipped: true });
         }
-        // =======================================================
+        // =========================================================
 
         const visitorIP = req.headers['x-forwarded-for'] 
             ? req.headers['x-forwarded-for'].split(',')[0] 
