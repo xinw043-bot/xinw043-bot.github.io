@@ -24,21 +24,38 @@
     <div class="loading">Redirecting to WhatsApp support...</div>
 
     <script>
+    // 1. 基础配置
     const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
-    const randomNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
-    
-    // 【修正点】必须填 Vercel 的完整域名！
-    // 只有这样，即使您在 GitHub Pages 访问，请求也能发到 Vercel 后端
+    // 务必确认此 API 地址是正确的
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
+
+    // ================= 核心修改：永久锁定逻辑 =================
+    
+    // 第一步：尝试从浏览器缓存里找“老熟人”
+    // 'assigned_wa' 是我们给这个缓存起的名字
+    let finalNumber = localStorage.getItem('assigned_wa');
+
+    // 第二步：判断
+    if (finalNumber) {
+        // 如果找到了（老客户），就什么都不做，直接用 finalNumber
+        console.log("欢迎老客户，保持分配原号码:", finalNumber);
+    } else {
+        // 如果没找到（新客户），随机分配一个
+        finalNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
+        
+        // 第三步：立刻把这个号码“纹”在客户浏览器上
+        localStorage.setItem('assigned_wa', finalNumber);
+        console.log("新客户，首次分配并锁定号码:", finalNumber);
+    }
+    // ========================================================
 
     window.onload = function() {
         const logData = {
-            phoneNumber: randomNumber,
-            // 建议用 toISOString，数据库看起来更规范
+            phoneNumber: finalNumber, // 使用锁定后的号码
             redirectTime: new Date().toISOString()
         };
 
-        // 使用 fetch 配合 keepalive: true (这是正确的做法)
+        // 发送日志 (使用 keepalive 防止丢失)
         fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -48,9 +65,9 @@
         .then(() => console.log("日志请求已发出"))
         .catch(err => console.error("发送失败:", err));
 
-        // 800ms 延迟跳转
+        // 延迟跳转
         setTimeout(() => {
-            window.location.href = `https://wa.me/${randomNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+            window.location.href = `https://wa.me/${finalNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
         }, 800);
     };
 </script>
