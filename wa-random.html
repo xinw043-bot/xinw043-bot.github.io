@@ -3,73 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Jump</title>
+    <title>Connect on WhatsApp</title>
     <style>
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
             margin: 0;
             padding: 20px;
-            font-family: Arial, sans-serif;
             text-align: center;
-            background-color: #f5f5f5;
         }
-        .loading {
-            color: #333;
-            font-size: 16px;
-            margin-top: 50px;
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
         }
+        h2 { color: #333; margin-bottom: 10px; }
+        p { color: #666; margin-bottom: 25px; }
+        
+        /* 漂亮的绿色按钮 */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px 0;
+            background-color: #25D366;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 25px;
+            transition: background 0.3s;
+            box-sizing: border-box; /* 确保padding不撑大宽度 */
+        }
+        .btn:hover { background-color: #128C7E; }
+        
+        .loading { font-size: 14px; color: #999; margin-top: 15px; }
     </style>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
 </head>
 <body>
-    <div class="loading">Redirecting to WhatsApp support...</div>
+
+    <div class="container">
+        <!-- 显示WhatsApp图标增加信任感 -->
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.472 14.382C17.112 14.202 15.344 13.332 15.013 13.213C14.682 13.094 14.441 13.034 14.2 13.394C13.959 13.754 13.269 14.564 13.058 14.804C12.848 15.044 12.638 15.074 12.278 14.894C11.918 14.714 10.758 14.334 9.383 13.109C8.308 12.15 7.583 10.966 7.373 10.606C7.163 10.246 7.35 10.051 7.53 9.871C7.69 9.711 7.886 9.455 8.066 9.245C8.246 9.035 8.306 8.885 8.426 8.645C8.546 8.405 8.486 8.195 8.411 8.045C8.336 7.895 7.646 6.196 7.361 5.506C7.081 4.832 6.796 4.922 6.586 4.922C6.391 4.922 6.166 4.907 5.941 4.907C5.716 4.907 5.356 4.997 5.056 5.327C4.756 5.657 3.9 6.467 3.9 8.117C3.9 9.767 5.101 11.372 5.281 11.612C5.461 11.852 7.771 15.418 11.311 16.948C12.152 17.308 12.809 17.524 13.323 17.687C14.167 17.955 14.937 17.917 15.545 17.826C16.219 17.726 17.622 16.976 17.914 16.151C18.206 15.326 18.206 14.621 18.116 14.471C18.026 14.321 17.786 14.261 17.426 14.081H17.472Z" fill="white"/>
+        </svg>
+
+        <h2>Chat on WhatsApp</h2>
+        <p>Click the button below if not redirected...</p>
+        
+        <!-- 按钮默认就是去 WhatsApp App -->
+        <a id="wa-link" href="#" class="btn">Start Chat</a>
+        
+        <div class="loading">Redirecting securely...</div>
+    </div>
 
     <script>
-    // 1. 基础配置
+    // 1. 配置
     const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
-    // 务必确认此 API 地址是正确的
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // ================= 核心修改：永久锁定逻辑 =================
-    
-    // 第一步：尝试从浏览器缓存里找“老熟人”
-    // 'assigned_wa' 是我们给这个缓存起的名字
+    // 2. 锁定号码逻辑
     let finalNumber = localStorage.getItem('assigned_wa');
-
-    // 第二步：判断
-    if (finalNumber) {
-        // 如果找到了（老客户），就什么都不做，直接用 finalNumber
-        console.log("欢迎老客户，保持分配原号码:", finalNumber);
-    } else {
-        // 如果没找到（新客户），随机分配一个
+    if (!finalNumber) {
         finalNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
-        
-        // 第三步：立刻把这个号码“纹”在客户浏览器上
         localStorage.setItem('assigned_wa', finalNumber);
-        console.log("新客户，首次分配并锁定号码:", finalNumber);
     }
-    // ========================================================
+
+    // 3. 构建深度链接 (Deep Link)
+    // 这种格式 (whatsapp://) 比 https://wa.me/ 更容易唤起 App
+    const message = encodeURIComponent("Hi I want to inquire about thermal imaging cameras");
+    const deepLink = `whatsapp://send?phone=${finalNumber}&text=${message}`;
+    const webLink = `https://wa.me/${finalNumber}?text=${message}`;
+
+    // 4. 将链接绑定到按钮 (双保险)
+    const btn = document.getElementById('wa-link');
+    // 优先尝试 Deep Link，如果用户没有 App，这种方式可能会报错，但在 Messenger 里这是必须的
+    // 为了兼容性，我们这里做一个简单的判断：如果是移动端，用 DeepLink，PC端用 WebLink
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    btn.href = isMobile ? deepLink : webLink;
 
     window.onload = function() {
+        // --- A. 发送日志 ---
         const logData = {
-            phoneNumber: finalNumber, // 使用锁定后的号码
+            phoneNumber: finalNumber,
             redirectTime: new Date().toISOString()
         };
-
-        // 发送日志 (使用 keepalive 防止丢失)
         fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(logData),
             keepalive: true 
-        })
-        .then(() => console.log("日志请求已发出"))
-        .catch(err => console.error("发送失败:", err));
+        }).catch(console.error);
 
-        // 延迟跳转
+        // --- B. 执行跳转 (针对 Messenger 的特殊处理) ---
+        
+        // 延迟一点点，给 Fetch 一点时间，也给用户一点反应时间
         setTimeout(() => {
-            window.location.href = `https://wa.me/${finalNumber}?text=Hi%20I%20want%20to%20inquire%20about%20thermal%20imaging%20cameras`;
+            if (isMobile) {
+                // 核心技巧：创建一个隐藏的 iframe 来尝试唤起 App
+                // 这种方式比 window.location 更加温和，不容易被 Messenger 屏蔽
+                // 同时也避免了如果没有安装 WhatsApp 导致的页面报错
+                const iframe = document.createElement("iframe");
+                iframe.style.border = "none";
+                iframe.style.width = "1px";
+                iframe.style.height = "1px";
+                iframe.src = deepLink;
+                document.body.appendChild(iframe);
+                
+                // 为了保险，再尝试一次模拟点击 (部分浏览器需要用户交互)
+                // btn.click(); // Messenger 有时会拦截纯代码 click，所以我们保留 UI 让用户点
+                
+                // 如果 2秒后还在当前页面，说明唤起失败，尝试用 window.location 兜底
+                setTimeout(() => {
+                     window.location.href = deepLink;
+                }, 2500);
+            } else {
+                // PC 端直接跳网页版
+                window.location.href = webLink;
+            }
         }, 800);
     };
-</script>
+    </script>
 </body>
 </html>
