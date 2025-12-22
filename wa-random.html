@@ -112,16 +112,26 @@
     </div>
 
     <script>
-    // --- 1. 配置号码池 ---
-    // 俄语市场号码池 (俄罗斯语用户)
+    // --- 1. 配置号码池 (请在此处修改各语言对应的号码) ---
+    
+    // A. 俄语 (Russian)
     const ruNumbers = ["8613831115956", "8615580779722"];
     
-    // 默认号码池 (英语及其他所有语言)
+    // B. 西班牙语 (Spanish)
+    // ⚠️ 如果您有专门的西语业务员，请把号码填在这里。
+    // 如果没有，暂时使用默认号码。
+    const esNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
+
+    // C. 阿拉伯语 (Arabic)
+    // ⚠️ 如果有专门的阿语业务员，请修改这里。
+    const arNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
+
+    // D. 默认/英语 (Default/English)
     const defaultNumbers = ["8613890174417", "8619994654895", "8618923713151"];
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // --- 2. 语言包配置 ---
+    // --- 2. 语言包配置 (新增 es 和 ar) ---
     const translations = {
         // 默认 (英语)
         'en': {
@@ -132,35 +142,63 @@
             copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras"
         },
-        // 俄语
+        // 俄语 (Russian)
         'ru': {
             openBtn: "Открыть WhatsApp",
             copyBtn: "Скопировать номер",
             hint: "WhatsApp не открывается? Скопируйте номер выше и добавьте вручную для продолжения.",
             loading: "Перенаправление...",
             copied: "Скопировано! ✅",
-            message: "Здравствуйте, я хочу узнать о тепловизионных камерах" // 俄语问候语
+            message: "Здравствуйте, я хочу узнать о тепловизионных камерах"
+        },
+        // 西班牙语 (Spanish)
+        'es': {
+            openBtn: "Abrir WhatsApp",
+            copyBtn: "Copiar WhatsApp de Ventas",
+            hint: "¿No abre WhatsApp? Copie el número de arriba y agréguelo manualmente para continuar.",
+            loading: "Redirigiendo...",
+            copied: "¡Copiado! ✅",
+            message: "Hola, quiero consultar sobre cámaras termográficas"
+        },
+        // 阿拉伯语 (Arabic)
+        'ar': {
+            openBtn: "فتح واتساب",
+            copyBtn: "نسخ رقم واتساب",
+            hint: "واتساب لا يفتح؟ انسخ الرقم أعلاه وأضفه يدوياً للمتابعة.",
+            loading: "جاري التوجيه...",
+            copied: "تم النسخ! ✅",
+            message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية"
         }
     };
 
     // --- 3. 核心逻辑：语言检测与号码分配 ---
     
-    // 获取用户浏览器语言 (取前两位，如 'en-US' -> 'en', 'ru-RU' -> 'ru')
+    // 获取用户浏览器语言
     const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
     
-    // 确定当前使用的语言包 (如果是俄语用 ru，其他统统用 en)
-    const currentLang = (userLang === 'ru') ? 'ru' : 'en';
+    // 确定当前配置
+    let currentLang = 'en'; // 默认英语
+    let currentPool = defaultNumbers;
+
+    if (translations[userLang]) {
+        // 如果支持该语言，则切换
+        currentLang = userLang;
+        if (userLang === 'ru') currentPool = ruNumbers;
+        else if (userLang === 'es') currentPool = esNumbers;
+        else if (userLang === 'ar') currentPool = arNumbers;
+    }
+
     const t = translations[currentLang];
 
-    // 确定当前使用的号码池
-    const currentPool = (userLang === 'ru') ? ruNumbers : defaultNumbers;
+    // RTL 适配：如果是阿拉伯语，设置页面从右向左显示
+    if (currentLang === 'ar') {
+        document.body.setAttribute('dir', 'rtl');
+    }
 
     // 锁定号码逻辑
     let finalNumber = localStorage.getItem('assigned_wa');
     
-    // 如果没有分配过，或者分配过但语言环境变了(比如之前是英语环境存了英语号，现在切了俄语环境)，
-    // 我们需要确保分配正确的池子。
-    // 为了简单稳健：如果已存在的号码不在当前池子里，我们视为新用户重新分配。
+    // 如果没有分配过，或者语言环境变了导致池子不匹配，重新分配
     if (!finalNumber || !currentPool.includes(finalNumber)) {
         finalNumber = currentPool[Math.floor(Math.random() * currentPool.length)];
         localStorage.setItem('assigned_wa', finalNumber);
@@ -173,7 +211,7 @@
     document.getElementById('loading-text').innerText = t.loading;
 
     // --- 5. 链接生成 ---
-    const message = encodeURIComponent(t.message); // 使用对应语言的问候语
+    const message = encodeURIComponent(t.message); 
     
     // 环境检测
     const ua = navigator.userAgent || navigator.vendor || window.opera;
@@ -201,7 +239,7 @@
         // 按钮反馈
         const btn = document.getElementById('copy-btn');
         const originalText = btn.innerText;
-        btn.innerText = t.copied; // 使用对应语言的反馈文字
+        btn.innerText = t.copied; 
         btn.style.backgroundColor = "#128C7E"; 
         
         setTimeout(() => {
@@ -215,7 +253,7 @@
         const logData = { 
             phoneNumber: finalNumber, 
             redirectTime: new Date().toISOString(),
-            language: userLang // 顺便记录一下用户的语言
+            language: userLang // 记录真实语言代码 (如 es, ar)
         };
         fetch(apiUrl, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -235,7 +273,6 @@
             
         } else {
             // 安卓 & PC 环境：执行自动跳转
-            // Android 使用协议跳转，PC 使用 HTTPS 跳转
             setTimeout(() => { 
                 window.location.href = targetLink; 
             }, 1000);
