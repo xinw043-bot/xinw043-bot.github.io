@@ -19,19 +19,19 @@
         
         .container {
             background: white;
-            padding: 40px 25px; /* 增加上下内边距，让卡片更舒展 */
-            border-radius: 16px; /* 圆角稍微大一点，更现代 */
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08); /* 阴影更柔和 */
+            padding: 40px 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
             max-width: 380px;
             width: 100%;
             text-align: center;
             box-sizing: border-box;
         }
         
-        /* 头部图标 */
+        /* 头部图标样式 */
         .icon-svg { 
-            margin-bottom: 30px; /* Logo 和按钮之间的距离 */
-            filter: drop-shadow(0 2px 4px rgba(37, 211, 102, 0.2)); /* 给 Logo 加一点微光 */
+            margin-bottom: 25px; 
+            filter: drop-shadow(0 4px 6px rgba(37, 211, 102, 0.3)); /* 增加一点立体感 */
         }
         
         /* 通用按钮样式 */
@@ -43,9 +43,9 @@
             padding: 16px 0;
             color: white;
             text-decoration: none;
-            font-weight: 600; /* 字体加粗但不过分 */
+            font-weight: 600;
             font-size: 17px;
-            border-radius: 12px; /* 按钮圆角稍微方一点点，像 iOS 原生 */
+            border-radius: 12px;
             margin-bottom: 15px;
             cursor: pointer;
             border: none;
@@ -55,7 +55,7 @@
         }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
 
-        /* 主按钮 (WhatsApp 绿) */
+        /* 主按钮 (绿色) */
         .btn-primary { 
             background-color: #25D366; 
             box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
@@ -65,46 +65,48 @@
         .btn-copy { 
             background-color: #0084ff; 
             box-shadow: 0 4px 10px rgba(0, 132, 255, 0.3);
-            margin-bottom: 0; /* 最后一个按钮不需要下边距 */
+            margin-bottom: 0; 
         }
         
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
-        /* 底部红色提示语 */
+        /* 底部提示语 (您要求的修改) */
         .ios-hint-text {
-            font-size: 13px;
+            font-size: 14px; /* 字体稍微调大一点点，更清晰 */
             color: #d93025; 
             background-color: #fff5f5;
-            padding: 12px;
+            padding: 15px;
             border-radius: 8px;
-            margin-top: 25px; /* 与上方按钮拉开距离 */
+            margin-top: 25px;
             line-height: 1.5;
-            text-align: left;
-            display: none; /* 默认隐藏 */
+            text-align: center; /* 居中对齐更好看 */
+            display: none; 
             border: 1px solid #ffebeb;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- WhatsApp 图标 -->
-        <svg class="icon-svg" width="70" height="70" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
-            <path d="M17.472 14.382C17.112 14.202 15.344 13.332 15.013 13.213C14.682 13.094 14.441 13.034 14.2 13.394C13.959 13.754 13.269 14.564 13.058 14.804C12.848 15.044 12.638 15.074 12.278 14.894C11.918 14.714 10.758 14.334 9.383 13.109C8.308 12.15 7.583 10.966 7.373 10.606C7.163 10.246 7.35 10.051 7.53 9.871C7.69 9.711 7.886 9.455 8.066 9.245C8.246 9.035 8.306 8.885 8.426 8.645C8.546 8.405 8.486 8.195 8.411 8.045C8.336 7.895 7.646 6.196 7.361 5.506C7.081 4.832 6.796 4.922 6.586 4.922C6.391 4.922 6.166 4.907 5.941 4.907C5.716 4.907 5.356 4.997 5.056 5.327C4.756 5.657 3.9 6.467 3.9 8.117C3.9 9.767 5.101 11.372 5.281 11.612C5.461 11.852 7.771 15.418 11.311 16.948C12.152 17.308 12.809 17.524 13.323 17.687C14.167 17.955 14.937 17.917 15.545 17.826C16.219 17.726 17.622 16.976 17.914 16.151C18.206 15.326 18.206 14.621 18.116 14.471C18.026 14.321 17.786 14.261 17.426 14.081H17.472Z" fill="white"/>
+        <!-- 1. WhatsApp 官方 Logo (标准图标) -->
+        <svg class="icon-svg" width="80" height="80" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M18.403 5.633A8.919 8.919 0 0 0 12.053 3c-4.948 0-8.976 4.027-8.978 8.977 0 1.582.413 3.126 1.198 4.488L3 21.116l4.759-1.249a8.981 8.981 0 0 0 4.29 1.093h.004c4.947 0 8.975-4.027 8.977-8.977a8.926 8.926 0 0 0-2.627-6.35m-6.35 13.812h-.003a7.446 7.446 0 0 1-3.798-1.041l-.272-.162-2.824.741.753-2.753-.177-.282a7.448 7.448 0 0 1-1.141-3.971c.002-4.114 3.349-7.461 7.465-7.461a7.413 7.413 0 0 1 5.275 2.188 7.42 7.42 0 0 1 2.183 5.279c-.002 4.114-3.349 7.462-7.461 7.462m4.093-5.589c-.225-.113-1.327-.655-1.533-.73-.205-.075-.354-.112-.504.112-.15.224-.579.73-.71.88-.131.149-.262.168-.486.056-.224-.112-9.46-3.515-1.089-5.968.223-.111.432-.167.578-.167.126 0 .252 0 .373.003.111.002.261.041.396.115s.9 2.196 1.025 2.502c.038.094.02.179-.06.305" fill="#25D366"/>
+             <!-- 这里的路径绘制的是空心部分，下面加一个白色背景层确保在任何背景下都好看 -->
+             <path d="M12.053 21.5C17.3 21.5 21.5 17.3 21.5 12C21.5 6.7 17.3 2.5 12.053 2.5C6.8 2.5 2.6 6.7 2.6 12C2.6 17.3 6.8 21.5 12.053 21.5Z" fill="white" style="mix-blend-mode: destination-over;"/>
         </svg>
 
-        <!-- 按钮 A: 直接打开 (绿色) -->
+        <!-- 按钮 A: 直接打开 -->
         <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
         
-        <!-- 按钮 B: 复制账号 (蓝色 - 默认隐藏) -->
+        <!-- 按钮 B: 复制账号 -->
         <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
-            Copy Sales WhatsApp
+            Copy Sales WhatsApp ID
         </button>
         
-        <!-- iOS 英文提示语 -->
+        <!-- 2. 底部提示语 (iOS 专用) -->
         <div id="ios-hint" class="ios-hint-text">
-            <b>Connection Issue?</b><br>
-            If WhatsApp fails to open, please tap the blue button above to copy the number, then add it manually to continue our discussion.
+            WhatsApp not opening? Copy the sales WhatsApp above and add manually to continue .
         </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
@@ -114,7 +116,7 @@
     const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // 1. 锁定号码逻辑
+    // 锁定号码
     let finalNumber = localStorage.getItem('assigned_wa');
     if (!finalNumber) {
         finalNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
@@ -123,21 +125,21 @@
 
     const message = encodeURIComponent("Hi I want to inquire about thermal imaging cameras");
     
-    // 2. 环境检测
+    // 环境检测
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isAndroid = /Android/i.test(ua);
     const isIOS = /iPhone|iPad|iPod/i.test(ua);
     
-    // 3. 链接生成
+    // 链接生成
     const androidLink = `whatsapp://send?phone=${finalNumber}&text=${message}`;
     const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${message}`; 
     const targetLink = isAndroid ? androidLink : iosLink;
 
-    // 绑定主按钮
+    // 绑定按钮
     const linkBtn = document.getElementById('wa-link');
     linkBtn.href = targetLink;
 
-    // 4. 复制号码功能
+    // 复制号码功能
     function copyNumber() {
         const tempInput = document.createElement("input");
         tempInput.value = "+" + finalNumber;
@@ -150,11 +152,10 @@
         const btn = document.getElementById('copy-btn');
         const originalText = btn.innerText;
         btn.innerText = "Copied! ✅";
-        btn.style.backgroundColor = "#128C7E"; // 成功后变绿
+        btn.style.backgroundColor = "#128C7E"; 
         
-        // 2秒后恢复
         setTimeout(() => {
-            btn.innerText = "Copy Sales WhatsApp";
+            btn.innerText = originalText;
             btn.style.backgroundColor = "#0084ff";
         }, 2000);
     }
@@ -167,26 +168,23 @@
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
-        // --- 逻辑分支 ---
+        // 逻辑分支
         const loadingText = document.getElementById('loading-text');
         const copyBtn = document.getElementById('copy-btn');
         const iosHint = document.getElementById('ios-hint');
 
         if (isIOS) {
-            // === iOS 环境 ===
-            // 隐藏 Loading，因为我们不再自动跳转
+            // iOS 环境
             loadingText.style.display = 'none';
-            
-            // 显示复制按钮和提示
+            // 显示复制按钮和新文案
             copyBtn.style.display = 'flex';
             iosHint.style.display = 'block';
             
         } else if (isAndroid) {
-            // === Android 环境 ===
-            // 安卓继续尝试自动跳转
+            // Android 环境自动跳转
             setTimeout(() => { window.location.href = targetLink; }, 1000);
         } else {
-            // === PC 环境 ===
+            // PC 环境
             loadingText.style.display = 'none';
         }
     };
