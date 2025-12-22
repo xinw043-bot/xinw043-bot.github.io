@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Connect on WhatsApp</title>
     <style>
         body {
@@ -19,32 +19,45 @@
         }
         .container {
             background: white;
-            padding: 30px;
+            padding: 30px 20px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             max-width: 400px;
             width: 100%;
         }
-        h2 { color: #333; margin-bottom: 10px; }
-        p { color: #666; margin-bottom: 25px; }
+        h2 { color: #333; margin-bottom: 10px; font-size: 22px; }
+        p { color: #666; margin-bottom: 25px; font-size: 16px; line-height: 1.5; }
         
         .btn {
             display: block;
             width: 100%;
-            padding: 15px 0;
+            padding: 16px 0;
             background-color: #25D366;
             color: white;
             text-decoration: none;
             font-weight: bold;
             font-size: 18px;
-            border-radius: 25px;
-            transition: background 0.3s;
+            border-radius: 30px;
+            transition: opacity 0.3s;
             box-sizing: border-box;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        .btn:hover { background-color: #128C7E; }
+        .btn:active { opacity: 0.8; transform: scale(0.98); }
         
-        .loading { font-size: 14px; color: #999; margin-top: 15px; }
+        .loading { font-size: 13px; color: #999; margin-top: 20px; min-height: 20px; }
+        
+        /* 针对 iOS 无法跳转时的备用提示 */
+        .safari-hint {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            display: none; /* 默认隐藏 */
+        }
     </style>
 </head>
 <body>
@@ -55,11 +68,19 @@
         </svg>
 
         <h2>Chat on WhatsApp</h2>
-        <p>Click the button below to start chat</p>
+        <p id="status-text">Click the button below to start chat</p>
         
-        <a id="wa-link" href="#" class="btn">Open WhatsApp</a>
+        <!-- 核心修改：target="_blank" 是解决 iOS 页面损坏的关键 -->
+        <a id="wa-link" href="#" target="_blank" class="btn">Open WhatsApp</a>
         
-        <div class="loading">Loading...</div>
+        <div id="loading-text" class="loading">Secure connection...</div>
+
+        <!-- 备用方案提示 -->
+        <div id="safari-hint" class="safari-hint">
+            Button not working?<br>
+            Tap the <b>•••</b> icon at top-right and select<br>
+            <b>"Open in Safari"</b> or <b>"Open in Browser"</b>.
+        </div>
     </div>
 
     <script>
@@ -75,23 +96,23 @@
 
     const message = encodeURIComponent("Hi I want to inquire about thermal imaging cameras");
     
-    // --- 核心修改：智能判断系统 ---
+    // 环境检测
+    const ua = navigator.userAgent;
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
     
-    // 1. 检测是否为安卓
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    
-    // 2. 定义目标链接
+    // 链接策略
     let targetLink;
-
     if (isAndroid) {
-        // 安卓：用协议跳转，体验最爽，直接拉起 APP
+        // 安卓：Deep Link
         targetLink = `whatsapp://send?phone=${finalNumber}&text=${message}`;
     } else {
-        // iOS 和 电脑：用 HTTPS 跳转，最稳，不会报错
+        // iOS/PC：使用标准 API 链接
+        // 配合 target="_blank" 可解决 Messenger 报错
         targetLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${message}`;
     }
 
-    // 3. 绑定按钮
+    // 绑定按钮
     const btn = document.getElementById('wa-link');
     btn.href = targetLink;
 
@@ -108,10 +129,31 @@
             keepalive: true 
         }).catch(console.error);
 
-        // 执行跳转
-        setTimeout(() => {
-            window.location.href = targetLink;
-        }, 1500);
+        // --- 跳转逻辑 ---
+        const statusText = document.getElementById('status-text');
+        const loadingText = document.getElementById('loading-text');
+        const safariHint = document.getElementById('safari-hint');
+
+        if (isIOS) {
+            // iOS：不自动跳转，只显示提示
+            loadingText.style.display = 'none';
+            statusText.innerText = "Please tap the button below.";
+            // 在 iOS Messenger 中显示备用操作提示
+            if (ua.includes("FBAN") || ua.includes("FBAV")) {
+                safariHint.style.display = 'block';
+            }
+        } else {
+            // 安卓/PC：尝试自动跳转
+            loadingText.innerText = "Redirecting...";
+            setTimeout(() => {
+                // 如果是安卓，尝试点击按钮触发 Deep Link
+                if(isAndroid) {
+                    btn.click();
+                } else {
+                    window.location.href = targetLink;
+                }
+            }, 1000);
+        }
     };
     </script>
 </body>
