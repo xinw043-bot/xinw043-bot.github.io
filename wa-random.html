@@ -25,17 +25,20 @@
             max-width: 400px;
             width: 100%;
         }
+        
+        /* 头部图标 */
+        .icon-svg { margin-bottom: 15px; }
+        
         h2 { color: #333; margin-bottom: 10px; font-size: 22px; }
         p { color: #666; margin-bottom: 25px; font-size: 16px; line-height: 1.5; }
         
-        /* 主按钮 (绿色) */
+        /* 通用按钮样式 */
         .btn {
             display: flex;
             align-items: center;
             justify-content: center;
             width: 100%;
             padding: 16px 0;
-            background-color: #25D366;
             color: white;
             text-decoration: none;
             font-weight: bold;
@@ -43,58 +46,77 @@
             border-radius: 30px;
             margin-bottom: 15px;
             cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
             border: none;
+            -webkit-tap-highlight-color: transparent;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: opacity 0.2s;
         }
-        .btn:active { opacity: 0.8; }
+        .btn:active { opacity: 0.8; transform: scale(0.98); }
 
-        /* 复制按钮 (蓝色 - 针对 iOS Messenger) */
-        .btn-copy {
-            background-color: #0084ff; /* Messenger 蓝 */
-            color: white;
+        /* 主按钮 (绿色) - 用于直接跳转 */
+        .btn-primary { background-color: #25D366; }
+
+        /* 复制按钮 (蓝色) - iOS 专用 */
+        .btn-copy { 
+            background-color: #0084ff; 
+            margin-bottom: 10px; /* 稍微缩小间距 */
         }
-
+        
         .loading { font-size: 13px; color: #999; margin-top: 10px; }
         
-        /* 提示框 */
-        .hint-box {
-            background-color: #fff3cd;
-            border: 1px solid #ffeeba;
-            color: #856404;
+        /* 针对 iOS 的中文提示语样式 */
+        .ios-hint-text {
+            font-size: 13px;
+            color: #d93025; /* 红色警示色，显眼 */
+            background-color: #fff5f5;
             padding: 10px;
             border-radius: 8px;
-            font-size: 13px;
-            text-align: left;
+            border: 1px solid #ffebeb;
+            margin-top: 5px;
+            line-height: 1.4;
+            display: none; /* 默认隐藏 */
+        }
+
+        /* 专门用于显示号码的区域（可选，增加信任感） */
+        .number-display {
+            font-size: 14px;
+            color: #555;
             margin-bottom: 20px;
-            display: none;
+            background: #f9f9f9;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- 头部图标 -->
-        <svg width="60" height="60" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:15px">
+        <!-- WhatsApp 图标 -->
+        <svg class="icon-svg" width="60" height="60" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
             <path d="M17.472 14.382C17.112 14.202 15.344 13.332 15.013 13.213C14.682 13.094 14.441 13.034 14.2 13.394C13.959 13.754 13.269 14.564 13.058 14.804C12.848 15.044 12.638 15.074 12.278 14.894C11.918 14.714 10.758 14.334 9.383 13.109C8.308 12.15 7.583 10.966 7.373 10.606C7.163 10.246 7.35 10.051 7.53 9.871C7.69 9.711 7.886 9.455 8.066 9.245C8.246 9.035 8.306 8.885 8.426 8.645C8.546 8.405 8.486 8.195 8.411 8.045C8.336 7.895 7.646 6.196 7.361 5.506C7.081 4.832 6.796 4.922 6.586 4.922C6.391 4.922 6.166 4.907 5.941 4.907C5.716 4.907 5.356 4.997 5.056 5.327C4.756 5.657 3.9 6.467 3.9 8.117C3.9 9.767 5.101 11.372 5.281 11.612C5.461 11.852 7.771 15.418 11.311 16.948C12.152 17.308 12.809 17.524 13.323 17.687C14.167 17.955 14.937 17.917 15.545 17.826C16.219 17.726 17.622 16.976 17.914 16.151C18.206 15.326 18.206 14.621 18.116 14.471C18.026 14.321 17.786 14.261 17.426 14.081H17.472Z" fill="white"/>
         </svg>
 
         <h2 id="title-text">Chat on WhatsApp</h2>
         
-        <!-- 提示框 (仅 iOS Messenger 显示) -->
-        <div id="ios-hint" class="hint-box">
-            <b>Messenger blocks direct links.</b><br>
-            Please copy the link and open it in <b>Safari</b>.
-        </div>
+        <!-- 显示分配的号码 (可选，增加信任) -->
+        <div class="number-display">Support: <span id="disp-number">...</span></div>
 
         <p id="status-text">Click below to start chat</p>
         
-        <!-- 按钮 A: 直接打开 (安卓/普通浏览器) -->
-        <a id="wa-link" href="#" class="btn">Open WhatsApp</a>
+        <!-- 按钮 A: 直接打开 (绿色) -->
+        <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
         
-        <!-- 按钮 B: 复制链接 (iOS Messenger 专用) -->
-        <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyLink()">Copy Link</button>
+        <!-- 按钮 B: 复制账号 (蓝色 - 默认隐藏，仅 iOS 显示) -->
+        <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
+            复制账号 (Copy Number)
+        </button>
         
+        <!-- iOS 专用提示语 -->
+        <div id="ios-hint" class="ios-hint-text">
+            如果WhatsApp跳转失败，请点击上方蓝色按钮复制业务员WhatsApp账号，手动添加好友继续探讨合作事业。
+        </div>
+
         <div id="loading-text" class="loading">Loading...</div>
     </div>
 
@@ -109,76 +131,33 @@
         localStorage.setItem('assigned_wa', finalNumber);
     }
 
+    // 页面显示号码
+    document.getElementById('disp-number').innerText = "+" + finalNumber;
+
     const message = encodeURIComponent("Hi I want to inquire about thermal imaging cameras");
     
     // 2. 环境检测
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isAndroid = /Android/i.test(ua);
     const isIOS = /iPhone|iPad|iPod/i.test(ua);
-    // 检测是否在 Facebook/Messenger 内 (关键)
-    const isInAppBrowser = ua.includes("FBAN") || ua.includes("FBAV") || ua.includes("Messenger");
     
     // 3. 链接生成
     const androidLink = `whatsapp://send?phone=${finalNumber}&text=${message}`;
-    const iosLink = `https://wa.me/${finalNumber}?text=${message}`; 
+    const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${message}`; 
     const targetLink = isAndroid ? androidLink : iosLink;
 
-    // 绑定基础链接
+    // 绑定主按钮
     const linkBtn = document.getElementById('wa-link');
     linkBtn.href = targetLink;
 
-    // 4. 复制功能
-    function copyLink() {
+    // 4. 复制号码功能 (专门复制数字)
+    function copyNumber() {
         const tempInput = document.createElement("input");
-        tempInput.value = targetLink;
+        tempInput.value = "+" + finalNumber; // 复制带+号的号码，方便用户直接搜索
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand("copy");
         document.body.removeChild(tempInput);
         
-        const btn = document.getElementById('copy-btn');
-        btn.innerText = "Copied! Open Safari to Paste";
-        btn.style.backgroundColor = "#34b7f1";
-    }
-
-    window.onload = function() {
-        // 发送日志
-        const logData = { phoneNumber: finalNumber, redirectTime: new Date().toISOString() };
-        fetch(apiUrl, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(logData), keepalive: true 
-        }).catch(console.error);
-
-        // --- 核心逻辑分支 ---
-        const loadingText = document.getElementById('loading-text');
-        const statusText = document.getElementById('status-text');
-        const iosHint = document.getElementById('ios-hint');
-        const copyBtn = document.getElementById('copy-btn');
-        const openBtn = document.getElementById('wa-link');
-
-        // 场景 1: iOS 且在 Messenger 里 (最坏的情况)
-        if (isIOS && isInAppBrowser) {
-            console.log("iOS Messenger detected. Switching to Copy mode.");
-            loadingText.style.display = 'none';
-            
-            // 隐藏直接打开按钮（因为会报错），显示复制按钮
-            openBtn.style.display = 'none'; 
-            copyBtn.style.display = 'flex'; // 显示复制按钮
-            
-            iosHint.style.display = 'block'; // 显示黄色提示条
-            statusText.style.display = 'none';
-        } 
-        // 场景 2: 安卓 (最好的情况)
-        else if (isAndroid) {
-            loadingText.innerText = "Redirecting...";
-            setTimeout(() => { window.location.href = targetLink; }, 800);
-        }
-        // 场景 3: PC 或 普通 iOS 浏览器 (Safari)
-        else {
-            loadingText.style.display = 'none';
-            // 保持显示 "Open WhatsApp" 按钮，用户点击即可
-        }
-    };
-    </script>
-</body>
-</html>
+        // 按钮反馈
+        const btn = document.ge
