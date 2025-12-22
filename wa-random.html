@@ -1,206 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Connect on WhatsApp</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f0f2f5;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Connect on WhatsApp</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        
+        /* 图标样式 */
+        .icon-img {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 25px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+            border-radius: 20px;
+        }
+        
+        /* 通用按钮样式 */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 16px 0;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 17px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            border: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s, opacity 0.2s;
+            line-height: 1.2;
+        }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
 
-    .container {
-      background: white;
-      padding: 40px 25px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-      max-width: 380px;
-      width: 100%;
-      text-align: center;
-      box-sizing: border-box;
-    }
+        /* 主按钮 (绿色) */
+        .btn-primary { 
+            background-color: #25D366; 
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
+        }
 
-    /* 头部图标样式 */
-    .icon-svg {
-      margin-bottom: 25px;
-      filter: drop-shadow(0 4px 6px rgba(37, 211, 102, 0.3));
-      /* 增加一点立体感 */
-    }
-
-    /* 通用按钮样式 */
-    .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 16px 0;
-      color: white;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 17px;
-      border-radius: 12px;
-      margin-bottom: 15px;
-      cursor: pointer;
-      border: none;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.1s, opacity 0.2s;
-      line-height: 1.2;
-    }
-
-    .btn:active {
-      transform: scale(0.98);
-      opacity: 0.9;
-    }
-
-    /* 主按钮 (绿色) */
-    .btn-primary {
-      background-color: #25D366;
-      box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
-    }
-
-    /* 复制按钮 (Messenger 蓝) */
-    .btn-copy {
-      background-color: #0084ff;
-      box-shadow: 0 4px 10px rgba(0, 132, 255, 0.3);
-      margin-bottom: 0;
-    }
-
-    .loading {
-      font-size: 14px;
-      color: #888;
-      margin-top: 10px;
-    }
-
-    /* 底部提示语 (您要求的修改) */
-    .ios-hint-text {
-      font-size: 14px;
-      /* 字体稍微调大一点点，更清晰 */
-      color: #d93025;
-      background-color: #fff5f5;
-      padding: 15px;
-      border-radius: 8px;
-      margin-top: 25px;
-      line-height: 1.5;
-      text-align: center;
-      /* 居中对齐更好看 */
-      display: none;
-      border: 1px solid #ffebeb;
-      font-weight: 500;
-    }
-  </style>
+        /* 复制按钮 (蓝色) */
+        .btn-copy { 
+            background-color: #0084ff; 
+            box-shadow: 0 4px 10px rgba(0, 132, 255, 0.3);
+            margin-bottom: 0; 
+        }
+        
+        .loading { font-size: 14px; color: #888; margin-top: 10px; }
+        
+        /* iOS 提示语样式 */
+        .ios-hint-text {
+            font-size: 14px;
+            color: #d93025; 
+            background-color: #fff5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 25px;
+            line-height: 1.5;
+            text-align: center;
+            display: none; 
+            border: 1px solid #ffebeb;
+            font-weight: 500;
+        }
+    </style>
 </head>
-
 <body>
 
-  <div class="container">
-    <!-- 替换为新的 WhatsApp 图标（这里假设你有对应的本地图标或在线图标地址，若为本地需确保路径正确） -->
-    <!-- 以下以在线图标示例，实际使用时替换为你提供图的正确地址 -->
-    <img class="icon-svg" src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="80" height="80"
-      alt="WhatsApp Icon">
+    <div class="container">
+        <!-- WhatsApp 高清图标 -->
+        <img class="icon-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LjMtLjkuMS0xLjgtLjktMy0xLjYtNC4yLTMuNy0uNi0xLjEuNi0xIC4xLTItLjEtLjItLjItLjQtLjMtLjYtLjEtLjItLjEtLjQgMC0uNi4xLS4yLjQtLjkuNi0xLjMuMS0uMiAwLS40LS4xLS41LS4xLS4yLS45LTIuMi0xLjMtMy0uNC0uOC0uNy0uNy0xLS43aC0uOGMtLjMgMC0uNy4xLTEuMS41LS40LjQtMS41IDEuNS0xLjUgMy42IDAgMi4yIDEuNiA0LjMgMS44IDQuNi4yLjMgMy4xIDQuNyA3LjYgNi42IDIuNyAxLjEgMy44IDEuMSA1LjIuOSAxLjYtLjIgMy41LTEuNCA0LTIuOC41LTEuMy41LTIuNS4zLTIuNy0uMS0uMi0uNC0uMy0uOC0uNXoiIGZpbGw9IiMyNWQzNjYiLz48cGF0aCBkPSJNMTYuNiAwQzcuNCAwIDAgNy41IDAgMTYuN2MwIDMgLjggNS45IDIuMyA4LjRMLjYgMzNsOC4xLTIuMWMyLjQgMS40IDUuMSAyLjEgOCAyLjEgOS4xIDAgMTYuNS03LjUgMTYuNS0xNi43UzI1LjcgMCAxNi42IDB6IiBmaWxsPSJub25lIi8+PC9zdmc+" alt="WhatsApp">
 
-    <!-- 按钮 A: 直接打开 -->
-    <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
+        <!-- 按钮 A: 直接打开 -->
+        <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
+        
+        <!-- 按钮 B: 复制账号 -->
+        <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
+            Copy Sales WhatsApp
+        </button>
+        
+        <!-- 2. 底部提示语 (iOS 专用) -->
+        <div id="ios-hint" class="ios-hint-text">
+            WhatsApp not opening? Copy the sales WhatsApp above and add manually to continue.
+        </div>
 
-    <!-- 按钮 B: 复制账号 -->
-    <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
-      Copy Sales WhatsApp
-    </button>
-
-    <!-- 2. 底部提示语 (iOS 专用) -->
-    <div id="ios-hint" class="ios-hint-text">
-      WhatsApp not opening? Copy the sales WhatsApp above and add manually to continue .
+        <div id="loading-text" class="loading">Redirecting...</div>
     </div>
 
-    <div id="loading-text" class="loading">Redirecting...</div>
-  </div>
+    <script>
+    // --- 1. 配置号码池 ---
+    // 俄语市场号码池 (俄罗斯语用户)
+    const ruNumbers = ["8613831115956", "8615580779722"];
+    
+    // 默认号码池 (英语及其他所有语言)
+    const defaultNumbers = ["8613890174417", "8619994654895", "8618923713151"];
+    
+    const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-  <script>
-    const waNumbers = ["8613890174417", "8619994654895", "8618923713151"];
-    const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log";
+    // --- 2. 语言包配置 ---
+    const translations = {
+        // 默认 (英语)
+        'en': {
+            openBtn: "Open WhatsApp",
+            copyBtn: "Copy Sales WhatsApp",
+            hint: "WhatsApp not opening? Copy the sales WhatsApp above and add manually to continue.",
+            loading: "Redirecting...",
+            copied: "Copied! ✅",
+            message: "Hi, I want to inquire about thermal imaging cameras"
+        },
+        // 俄语
+        'ru': {
+            openBtn: "Открыть WhatsApp",
+            copyBtn: "Скопировать номер",
+            hint: "WhatsApp не открывается? Скопируйте номер выше и добавьте вручную для продолжения.",
+            loading: "Перенаправление...",
+            copied: "Скопировано! ✅",
+            message: "Здравствуйте, я хочу узнать о тепловизионных камерах" // 俄语问候语
+        }
+    };
 
-    // 锁定号码
+    // --- 3. 核心逻辑：语言检测与号码分配 ---
+    
+    // 获取用户浏览器语言 (取前两位，如 'en-US' -> 'en', 'ru-RU' -> 'ru')
+    const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
+    
+    // 确定当前使用的语言包 (如果是俄语用 ru，其他统统用 en)
+    const currentLang = (userLang === 'ru') ? 'ru' : 'en';
+    const t = translations[currentLang];
+
+    // 确定当前使用的号码池
+    const currentPool = (userLang === 'ru') ? ruNumbers : defaultNumbers;
+
+    // 锁定号码逻辑
     let finalNumber = localStorage.getItem('assigned_wa');
-    if (!finalNumber) {
-      finalNumber = waNumbers[Math.floor(Math.random() * waNumbers.length)];
-      localStorage.setItem('assigned_wa', finalNumber);
+    
+    // 如果没有分配过，或者分配过但语言环境变了(比如之前是英语环境存了英语号，现在切了俄语环境)，
+    // 我们需要确保分配正确的池子。
+    // 为了简单稳健：如果已存在的号码不在当前池子里，我们视为新用户重新分配。
+    if (!finalNumber || !currentPool.includes(finalNumber)) {
+        finalNumber = currentPool[Math.floor(Math.random() * currentPool.length)];
+        localStorage.setItem('assigned_wa', finalNumber);
     }
 
-    const message = encodeURIComponent("Hi I want to inquire about thermal imaging cameras");
+    // --- 4. 界面文字替换 (DOM 操作) ---
+    document.getElementById('wa-link').innerText = t.openBtn;
+    document.getElementById('copy-btn').innerText = t.copyBtn;
+    document.getElementById('ios-hint').innerText = t.hint;
+    document.getElementById('loading-text').innerText = t.loading;
 
+    // --- 5. 链接生成 ---
+    const message = encodeURIComponent(t.message); // 使用对应语言的问候语
+    
     // 环境检测
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isAndroid = /Android/i.test(ua);
     const isIOS = /iPhone|iPad|iPod/i.test(ua);
-
-    // 链接生成
+    
+    // 生成链接
     const androidLink = `whatsapp://send?phone=${finalNumber}&text=${message}`;
-    const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${message}`;
+    const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${message}`; 
     const targetLink = isAndroid ? androidLink : iosLink;
 
     // 绑定按钮
     const linkBtn = document.getElementById('wa-link');
     linkBtn.href = targetLink;
 
-    // 复制号码功能
+    // --- 6. 复制功能 ---
     function copyNumber() {
-      const tempInput = document.createElement("input");
-      tempInput.value = "+" + finalNumber;
-      document.body.appendChild(tempInput);
-      tempInput.select();
-      document.execCommand("copy");
-      document.body.removeChild(tempInput);
-
-      // 按钮反馈
-      const btn = document.getElementById('copy-btn');
-      const originalText = btn.innerText;
-      btn.innerText = "Copied! ✅";
-      btn.style.backgroundColor = "#128C7E";
-
-      setTimeout(() => {
-        btn.innerText = originalText;
-        btn.style.backgroundColor = "#0084ff";
-      }, 2000);
+        const tempInput = document.createElement("input");
+        tempInput.value = "+" + finalNumber;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        
+        // 按钮反馈
+        const btn = document.getElementById('copy-btn');
+        const originalText = btn.innerText;
+        btn.innerText = t.copied; // 使用对应语言的反馈文字
+        btn.style.backgroundColor = "#128C7E"; 
+        
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.backgroundColor = "#0084ff";
+        }, 2000);
     }
 
-    window.onload = function () {
-      // 发送日志
-      const logData = { phoneNumber: finalNumber, redirectTime: new Date().toISOString() };
-      fetch(apiUrl, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logData), keepalive: true
-      }).catch(console.error);
+    window.onload = function() {
+        // 发送日志
+        const logData = { 
+            phoneNumber: finalNumber, 
+            redirectTime: new Date().toISOString(),
+            language: userLang // 顺便记录一下用户的语言
+        };
+        fetch(apiUrl, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(logData), keepalive: true 
+        }).catch(console.error);
 
-      // 逻辑分支
-      const loadingText = document.getElementById('loading-text');
-      const copyBtn = document.getElementById('copy-btn');
-      const iosHint = document.getElementById('ios-hint');
+        // --- 跳转逻辑 ---
+        const loadingText = document.getElementById('loading-text');
+        const copyBtn = document.getElementById('copy-btn');
+        const iosHint = document.getElementById('ios-hint');
 
-      if (isIOS) {
-        // iOS 环境
-        loadingText.style.display = 'none';
-        // 显示复制按钮和新文案
-        copyBtn.style.display = 'flex';
-        iosHint.style.display = 'block';
-
-      } else {
-        // 非iOS环境（Android、PC等）自动跳转
-        setTimeout(() => {
-          window.location.href = targetLink;
-        }, 1000);
-        loadingText.style.display = 'block';
-      }
+        if (isIOS) {
+            // iOS 环境：停止自动跳转，显示手动操作界面
+            loadingText.style.display = 'none';
+            copyBtn.style.display = 'flex';
+            iosHint.style.display = 'block';
+            
+        } else {
+            // 安卓 & PC 环境：执行自动跳转
+            // Android 使用协议跳转，PC 使用 HTTPS 跳转
+            setTimeout(() => { 
+                window.location.href = targetLink; 
+            }, 1000);
+        }
     };
-  </script>
+    </script>
 </body>
-
 </html>
-
