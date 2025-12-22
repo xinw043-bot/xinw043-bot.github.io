@@ -160,4 +160,54 @@
         document.body.removeChild(tempInput);
         
         // 按钮反馈
-        const btn = document.ge
+        const btn = document.getElementById('copy-btn');
+        const originalText = btn.innerText;
+        btn.innerText = "已复制 (Copied!) ✅";
+        btn.style.backgroundColor = "#128C7E"; // 变成深绿色表示成功
+        
+        // 2秒后恢复文字
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.backgroundColor = "#0084ff";
+        }, 2000);
+    }
+
+    window.onload = function() {
+        // 发送日志
+        const logData = { phoneNumber: finalNumber, redirectTime: new Date().toISOString() };
+        fetch(apiUrl, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(logData), keepalive: true 
+        }).catch(console.error);
+
+        // --- 核心逻辑分支 ---
+        const loadingText = document.getElementById('loading-text');
+        const statusText = document.getElementById('status-text');
+        
+        // iOS 专用元素
+        const copyBtn = document.getElementById('copy-btn');
+        const iosHint = document.getElementById('ios-hint');
+
+        if (isIOS) {
+            // === iOS 环境 ===
+            console.log("iOS detected. Showing Copy button.");
+            loadingText.style.display = 'none';
+            statusText.innerText = "Please choose an option:";
+            
+            // 显示复制按钮和提示语
+            copyBtn.style.display = 'flex';
+            iosHint.style.display = 'block';
+            
+        } else if (isAndroid) {
+            // === Android 环境 ===
+            loadingText.innerText = "Redirecting...";
+            // 安卓尝试自动跳转
+            setTimeout(() => { window.location.href = targetLink; }, 1000);
+        } else {
+            // === PC/其他 ===
+            loadingText.style.display = 'none';
+        }
+    };
+    </script>
+</body>
+</html>
