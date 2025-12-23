@@ -70,12 +70,26 @@
             line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
         }
 
+        /* --- ID 区域交互优化 --- */
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
-            font-size: 12px; color: #999; font-family: sans-serif;
-            letter-spacing: 0.5px; font-style: italic; /* 前端也保持斜体 */
+            font-size: 12px; color: #999; font-family: monospace; 
+            letter-spacing: 0.5px; font-style: italic;
+            cursor: pointer; /* 变成手型，提示可点击 */
+            position: relative;
         }
+        /* 点击时的反馈效果 */
+        .ref-id-box:active { color: #25D366; background-color: #f0fff4; border-radius: 4px; }
+        
         .ref-id-text { color: #666; font-weight: normal; user-select: all; }
+        
+        /* 复制成功的提示小气泡 */
+        #id-copy-tip {
+            position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
+            background: #333; color: #fff; padding: 4px 8px;
+            border-radius: 4px; font-size: 10px; display: none;
+            font-family: sans-serif; font-style: normal; white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -89,13 +103,18 @@
             Copy Sales WhatsApp
         </button>
         
+        <!-- iOS 提示语 (文案优化) -->
         <div id="ios-hint" class="ios-hint-text">
-            If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.
+            If WhatsApp fails to open, please:<br>
+            1. Click blue button to copy number & add friend.<br>
+            2. <b>Tap the ID below to copy</b> & send to us.
         </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
-        <div class="ref-id-box">
+        <!-- 底部 ID 显示 (点击可复制) -->
+        <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
+            <span id="id-copy-tip">ID Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
         </div>
     </div>
@@ -111,25 +130,26 @@
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
-            hint: "If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.",
+            // 优化英文提示，引导复制ID
+            hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             loading: "Redirecting...", copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras"
         },
         'ru': {
             openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
-            hint: "Если WhatsApp не открывается, нажмите синюю кнопку выше, чтобы скопировать номер, и добавьте его вручную для продолжения.",
+            hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
             loading: "Перенаправление...", copied: "Скопировано! ✅",
             message: "Здравствуйте, я хочу узнать о тепловизионных камерах"
         },
         'es': {
             openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
-            hint: "Si WhatsApp no abre, haga clic en el botón azul para copiar el número y agréguelo manualmente.",
+            hint: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
             loading: "Redirigiendo...", copied: "¡Copiado! ✅",
             message: "Hola, quiero consultar sobre cámaras termográficas"
         },
         'ar': {
             openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
-            hint: "إذا لم يفتح واتساب، يرجى الضغط على الزر الأزرق لنسخ الرقم وإضافته يدوياً.",
+            hint: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
             loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
             message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية"
         }
@@ -173,11 +193,13 @@
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
+    // 支持 HTML 内容 (innerHTML) 以显示换行和加粗
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
-    document.getElementById('ios-hint').innerText = t.hint;
+    document.getElementById('ios-hint').innerHTML = t.hint; 
     document.getElementById('loading-text').innerText = t.loading;
 
+    // --- 链接生成 ---
     window.onload = function() {
         const logData = { 
             phoneNumber: finalNumber, 
@@ -190,14 +212,8 @@
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
-        // --- 核心修改 ---
         const spacer = "\n\n"; 
-        
-        // 【修改点】将整个字符串（包括ID）包裹在 _ _ 中，实现全斜体
-        // 效果： ─────
-        //       _INQUIRY ID : REF-XXXX_
         const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + "_";
-        
         const finalMessageText = `${t.message}${spacer}${idFormat}`; 
         const encodedMessage = encodeURIComponent(finalMessageText);
         
@@ -227,6 +243,7 @@
         }
     };
 
+    // 复制号码
     function copyNumber() {
         const tempInput = document.createElement("input");
         tempInput.value = "+" + finalNumber;
@@ -244,6 +261,24 @@
             btn.innerText = originalText;
             btn.style.backgroundColor = "#0084ff";
         }, 2000);
+    }
+
+    // 【新增】复制 ID
+    function copyId() {
+        const tempInput = document.createElement("input");
+        // 复制的内容直接是 "Ref: XXX"，方便业务员识别
+        tempInput.value = "Ref: " + inquiryId;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+
+        // 显示小气泡提示
+        const tip = document.getElementById('id-copy-tip');
+        tip.style.display = 'block';
+        setTimeout(() => {
+            tip.style.display = 'none';
+        }, 1500);
     }
     </script>
 </body>
