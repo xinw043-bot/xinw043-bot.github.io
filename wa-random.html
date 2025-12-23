@@ -28,6 +28,7 @@
             box-sizing: border-box;
         }
         
+        /* 图标样式 */
         .icon-img {
             width: 72px;
             height: 72px;
@@ -36,8 +37,10 @@
             border-radius: 18px;
         }
         
+        /* 标题 (隐藏) */
         h2 { display: none; }
         
+        /* 通用按钮样式 */
         .btn {
             display: flex;
             align-items: center;
@@ -59,10 +62,12 @@
         }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
 
+        /* 主按钮 (绿色) */
         .btn-primary { 
             background-color: #25D366; 
         }
 
+        /* 复制按钮 (蓝色) */
         .btn-copy { 
             background-color: #0084ff; 
             margin-bottom: 0; 
@@ -70,6 +75,7 @@
         
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
+        /* iOS 底部红色提示语 */
         .ios-hint-text {
             font-size: 13px;
             color: #d93025; 
@@ -83,6 +89,7 @@
             border: 1px solid #ffebeb;
         }
 
+        /* 询盘ID 前端显示样式 */
         .ref-id-box {
             margin-top: 25px;
             padding-top: 15px;
@@ -103,33 +110,41 @@
 <body>
 
     <div class="container">
+        <!-- WhatsApp 高清图标 -->
         <img class="icon-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+" alt="WhatsApp">
 
+        <!-- 按钮 A: 直接打开 -->
         <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
         
+        <!-- 按钮 B: 复制账号 -->
         <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
             Copy Sales WhatsApp
         </button>
         
+        <!-- iOS 提示语 -->
         <div id="ios-hint" class="ios-hint-text">
             If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.
         </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
+        <!-- 底部 ID 显示 -->
         <div class="ref-id-box">
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
         </div>
     </div>
 
     <script>
+    // --- 1. 号码池配置 ---
     const ruNumbers = ["8613831115956", "8615580779722"];
     const esNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
     const arNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
     const defaultNumbers = ["8613890174417", "8619994654895", "8618923713151"];
     
+    // 请确保此 API 地址正确
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
+    // --- 2. 语言包配置 ---
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
@@ -157,6 +172,7 @@
         }
     };
 
+    // --- 3. 生成 ID (REF-XXXX) ---
     function generateInquiryId() {
         let id = localStorage.getItem('wa_inquiry_id');
         if (!id) {
@@ -168,6 +184,7 @@
         return id;
     }
 
+    // --- 4. 核心逻辑 ---
     const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
     let currentLang = 'en'; 
     let currentPool = defaultNumbers;
@@ -195,30 +212,66 @@
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
+    // 界面文字更新
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
     document.getElementById('ios-hint').innerText = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    // --- 链接生成修改 ---
-    const spacer = "\n\n\n\n\n\n\n"; 
-    // 使用 ``` 包裹，使其在 WhatsApp 中显示为特殊的代码样式（视觉上像灰色背景）
-    const idFormat = "```INQUIRY ID : " + inquiryId + "```";
-    
-    const finalMessageText = `${t.message}${spacer}${idFormat}`; 
-    const encodedMessage = encodeURIComponent(finalMessageText);
-    
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isAndroid = /Android/i.test(ua);
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
-    
-    const androidLink = `whatsapp://send?phone=${finalNumber}&text=${encodedMessage}`;
-    const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${encodedMessage}`; 
-    const targetLink = isAndroid ? androidLink : iosLink;
+    // --- 5. 链接生成 (视觉优化版) ---
+    window.onload = function() {
+        // 发送日志
+        const logData = { 
+            phoneNumber: finalNumber, 
+            redirectTime: new Date().toISOString(),
+            language: userLang,
+            inquiryId: inquiryId 
+        };
+        fetch(apiUrl, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(logData), keepalive: true 
+        }).catch(console.error);
 
-    const linkBtn = document.getElementById('wa-link');
-    linkBtn.href = targetLink;
+        // --- 核心修改：使用引用样式 (>) ---
+        // 1. 沉底换行
+        const spacer = "\n\n\n\n\n\n\n"; 
+        
+        // 2. 使用 "> " 引用符号，会让文字变灰，看起来像系统注脚
+        const idFormat = "> INQUIRY ID : " + inquiryId;
+        
+        const finalMessageText = `${t.message}${spacer}${idFormat}`; 
+        const encodedMessage = encodeURIComponent(finalMessageText);
+        
+        // 生成链接
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        const isAndroid = /Android/i.test(ua);
+        const isIOS = /iPhone|iPad|iPod/i.test(ua);
+        
+        const androidLink = `whatsapp://send?phone=${finalNumber}&text=${encodedMessage}`;
+        const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${encodedMessage}`; 
+        const targetLink = isAndroid ? androidLink : iosLink;
 
+        // 更新按钮链接
+        const linkBtn = document.getElementById('wa-link');
+        linkBtn.href = targetLink;
+
+        // 跳转逻辑
+        const loadingText = document.getElementById('loading-text');
+        const copyBtn = document.getElementById('copy-btn');
+        const iosHint = document.getElementById('ios-hint');
+
+        if (isIOS) {
+            loadingText.style.display = 'none';
+            copyBtn.style.display = 'flex';
+            iosHint.style.display = 'block';
+        } else {
+            setTimeout(() => { 
+                window.location.href = targetLink; 
+            }, 1000);
+        }
+    };
+
+    // 复制功能
     function copyNumber() {
         const tempInput = document.createElement("input");
         tempInput.value = "+" + finalNumber;
@@ -237,33 +290,6 @@
             btn.style.backgroundColor = "#0084ff";
         }, 2000);
     }
-
-    window.onload = function() {
-        const logData = { 
-            phoneNumber: finalNumber, 
-            redirectTime: new Date().toISOString(),
-            language: userLang,
-            inquiryId: inquiryId 
-        };
-        fetch(apiUrl, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(logData), keepalive: true 
-        }).catch(console.error);
-
-        const loadingText = document.getElementById('loading-text');
-        const copyBtn = document.getElementById('copy-btn');
-        const iosHint = document.getElementById('ios-hint');
-
-        if (isIOS) {
-            loadingText.style.display = 'none';
-            copyBtn.style.display = 'flex';
-            iosHint.style.display = 'block';
-        } else {
-            setTimeout(() => { 
-                window.location.href = targetLink; 
-            }, 1000);
-        }
-    };
     </script>
 </body>
 </html>
