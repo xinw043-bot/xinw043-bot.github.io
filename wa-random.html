@@ -37,7 +37,6 @@
             border-radius: 18px;
         }
         
-        /* 标题 (隐藏) */
         h2 { display: none; }
         
         /* 通用按钮样式 */
@@ -75,7 +74,7 @@
         
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
-        /* iOS 底部红色提示语 */
+        /* iOS 提示语 */
         .ios-hint-text {
             font-size: 13px;
             color: #d93025; 
@@ -89,7 +88,7 @@
             border: 1px solid #ffebeb;
         }
 
-        /* 询盘ID 前端显示样式 */
+        /* 页面底部 ID 显示 */
         .ref-id-box {
             margin-top: 25px;
             padding-top: 15px;
@@ -141,7 +140,7 @@
     const arNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
     const defaultNumbers = ["8613890174417", "8619994654895", "8618923713151"];
     
-    // 请确保此 API 地址正确
+    // API地址
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
     // --- 2. 语言包配置 ---
@@ -172,7 +171,7 @@
         }
     };
 
-    // --- 3. 生成 ID (REF-XXXX) ---
+    // --- 3. 生成 ID ---
     function generateInquiryId() {
         let id = localStorage.getItem('wa_inquiry_id');
         if (!id) {
@@ -212,13 +211,12 @@
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
-    // 界面文字更新
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
     document.getElementById('ios-hint').innerText = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    // --- 5. 链接生成 (视觉优化版) ---
+    // --- 5. 链接生成 (修改版) ---
     window.onload = function() {
         // 发送日志
         const logData = { 
@@ -232,12 +230,15 @@
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
-        // --- 核心修改：使用引用样式 (>) ---
-        // 1. 沉底换行
-        const spacer = "\n\n\n\n\n\n\n"; 
+        // --- 核心修改：缩短空行 + 样式调整 ---
         
-        // 2. 使用 "> " 引用符号，会让文字变灰，看起来像系统注脚
-        const idFormat = "> INQUIRY ID : " + inquiryId;
+        // 1. 缩短空行 (仅2行，紧跟正文)
+        const spacer = "\n\n"; 
+        
+        // 2. 使用 "分割线 + 加粗标题 + 代码块内容"
+        // ━━━━━━━━━━━━━━
+        // *INQUIRY ID :* ```REF-XXXX```
+        const idFormat = "━━━━━━━━━━━━━━\n*INQUIRY ID :* ```" + inquiryId + "```";
         
         const finalMessageText = `${t.message}${spacer}${idFormat}`; 
         const encodedMessage = encodeURIComponent(finalMessageText);
@@ -251,7 +252,7 @@
         const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${encodedMessage}`; 
         const targetLink = isAndroid ? androidLink : iosLink;
 
-        // 更新按钮链接
+        // 更新按钮
         const linkBtn = document.getElementById('wa-link');
         linkBtn.href = targetLink;
 
