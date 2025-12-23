@@ -28,7 +28,6 @@
             box-sizing: border-box;
         }
         
-        /* 图标样式 */
         .icon-img {
             width: 72px;
             height: 72px;
@@ -37,10 +36,8 @@
             border-radius: 18px;
         }
         
-        /* 标题 (可选，已隐藏以保持简洁) */
         h2 { display: none; }
         
-        /* 通用按钮样式 */
         .btn {
             display: flex;
             align-items: center;
@@ -62,12 +59,10 @@
         }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
 
-        /* 主按钮 (绿色) */
         .btn-primary { 
             background-color: #25D366; 
         }
 
-        /* 复制按钮 (蓝色) */
         .btn-copy { 
             background-color: #0084ff; 
             margin-bottom: 0; 
@@ -75,7 +70,6 @@
         
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
-        /* iOS 底部红色提示语 */
         .ios-hint-text {
             font-size: 13px;
             color: #d93025; 
@@ -89,109 +83,83 @@
             border: 1px solid #ffebeb;
         }
 
-        /* --- 新增：询盘ID 显示样式 --- */
         .ref-id-box {
             margin-top: 25px;
             padding-top: 15px;
             border-top: 1px solid #eee;
             font-size: 12px;
             color: #999;
-            font-family: monospace; /* 等宽字体，看起来像代码/票据 */
-            letter-spacing: 1px;
+            font-family: monospace; 
+            letter-spacing: 0.5px;
+            text-transform: uppercase; 
         }
         .ref-id-text {
             color: #555;
             font-weight: bold;
-            user-select: all; /* 方便用户复制 */
+            user-select: all; 
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- WhatsApp 高清图标 -->
         <img class="icon-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+" alt="WhatsApp">
 
-        <!-- 按钮 A: 直接打开 -->
         <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
         
-        <!-- 按钮 B: 复制账号 -->
         <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
             Copy Sales WhatsApp
         </button>
         
-        <!-- iOS 提示语 -->
         <div id="ios-hint" class="ios-hint-text">
             If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.
         </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
-        <!-- 【核心新增】询盘 ID 显示区域 -->
         <div class="ref-id-box">
-            Inquiry Ref: <span id="ref-id-span" class="ref-id-text">...</span>
+            INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
         </div>
     </div>
 
     <script>
-    // --- 1. 配置号码池 ---
-    
-    // A. 俄语 (Russian)
     const ruNumbers = ["8613831115956", "8615580779722"];
-    
-    // B. 西班牙语 (Spanish)
     const esNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
-
-    // C. 阿拉伯语 (Arabic)
     const arNumbers = ["8613890174417", "8619994654895", "8618923713151"]; 
-
-    // D. 默认/英语 (Default/English)
     const defaultNumbers = ["8613890174417", "8619994654895", "8618923713151"];
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // --- 2. 语言包配置 ---
     const translations = {
         'en': {
-            openBtn: "Open WhatsApp",
-            copyBtn: "Copy Sales WhatsApp",
+            openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
             hint: "If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.",
-            loading: "Redirecting...",
-            copied: "Copied! ✅",
+            loading: "Redirecting...", copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras"
         },
         'ru': {
-            openBtn: "Открыть WhatsApp",
-            copyBtn: "Скопировать номер",
+            openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
             hint: "Если WhatsApp не открывается, нажмите синюю кнопку выше, чтобы скопировать номер, и добавьте его вручную для продолжения.",
-            loading: "Перенаправление...",
-            copied: "Скопировано! ✅",
+            loading: "Перенаправление...", copied: "Скопировано! ✅",
             message: "Здравствуйте, я хочу узнать о тепловизионных камерах"
         },
         'es': {
-            openBtn: "Abrir WhatsApp",
-            copyBtn: "Copiar WhatsApp",
+            openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
             hint: "Si WhatsApp no abre, haga clic en el botón azul para copiar el número y agréguelo manualmente.",
-            loading: "Redirigiendo...",
-            copied: "¡Copiado! ✅",
+            loading: "Redirigiendo...", copied: "¡Copiado! ✅",
             message: "Hola, quiero consultar sobre cámaras termográficas"
         },
         'ar': {
-            openBtn: "فتح واتساب",
-            copyBtn: "نسخ رقم واتساب",
+            openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
             hint: "إذا لم يفتح واتساب، يرجى الضغط على الزر الأزرق لنسخ الرقم وإضافته يدوياً.",
-            loading: "جاري التوجيه...",
-            copied: "تم النسخ! ✅",
+            loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
             message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية"
         }
     };
 
-    // --- 3. 生成唯一的询盘 ID (Hash) ---
     function generateInquiryId() {
-        // 尝试从缓存读取 (保持同一个用户 ID 不变)
         let id = localStorage.getItem('wa_inquiry_id');
         if (!id) {
-            // 生成逻辑: REF + 时间戳后4位 + 随机4位大写字母数字
             const timePart = Date.now().toString().slice(-4); 
             const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
             id = `REF-${timePart}${randomPart}`;
@@ -200,13 +168,8 @@
         return id;
     }
 
-    // --- 4. 核心逻辑：语言检测与号码分配 ---
-    
-    // 获取用户浏览器语言
     const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
-    
-    // 确定当前配置
-    let currentLang = 'en'; // 默认英语
+    let currentLang = 'en'; 
     let currentPool = defaultNumbers;
 
     if (translations[userLang]) {
@@ -218,49 +181,44 @@
 
     const t = translations[currentLang];
 
-    // RTL 适配
     if (currentLang === 'ar') {
         document.body.setAttribute('dir', 'rtl');
         document.querySelector('.ios-hint-text').style.textAlign = 'right';
     }
 
-    // 锁定号码逻辑
     let finalNumber = localStorage.getItem('assigned_wa');
     if (!finalNumber || !currentPool.includes(finalNumber)) {
         finalNumber = currentPool[Math.floor(Math.random() * currentPool.length)];
         localStorage.setItem('assigned_wa', finalNumber);
     }
 
-    // 获取并显示 ID
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
-    // --- 5. 界面文字替换 (DOM 操作) ---
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
     document.getElementById('ios-hint').innerText = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    // --- 6. 链接生成 (带 Ref ID) ---
-    // 在消息末尾加上 Ref ID，用换行符隔开
-    const finalMessageText = `${t.message}\n\n[Ref: ${inquiryId}]`; 
+    // --- 链接生成修改 ---
+    const spacer = "\n\n\n\n\n\n\n"; 
+    // 使用 ``` 包裹，使其在 WhatsApp 中显示为特殊的代码样式（视觉上像灰色背景）
+    const idFormat = "```INQUIRY ID : " + inquiryId + "```";
+    
+    const finalMessageText = `${t.message}${spacer}${idFormat}`; 
     const encodedMessage = encodeURIComponent(finalMessageText);
     
-    // 环境检测
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isAndroid = /Android/i.test(ua);
     const isIOS = /iPhone|iPad|iPod/i.test(ua);
     
-    // 生成链接
     const androidLink = `whatsapp://send?phone=${finalNumber}&text=${encodedMessage}`;
     const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${encodedMessage}`; 
     const targetLink = isAndroid ? androidLink : iosLink;
 
-    // 绑定按钮
     const linkBtn = document.getElementById('wa-link');
     linkBtn.href = targetLink;
 
-    // --- 7. 复制功能 ---
     function copyNumber() {
         const tempInput = document.createElement("input");
         tempInput.value = "+" + finalNumber;
@@ -269,7 +227,6 @@
         document.execCommand("copy");
         document.body.removeChild(tempInput);
         
-        // 按钮反馈
         const btn = document.getElementById('copy-btn');
         const originalText = btn.innerText;
         btn.innerText = t.copied; 
@@ -282,31 +239,26 @@
     }
 
     window.onload = function() {
-        // 发送日志 (带 inquiryId)
         const logData = { 
             phoneNumber: finalNumber, 
             redirectTime: new Date().toISOString(),
             language: userLang,
-            inquiryId: inquiryId // 发送给后端数据库
+            inquiryId: inquiryId 
         };
         fetch(apiUrl, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
-        // --- 跳转逻辑 ---
         const loadingText = document.getElementById('loading-text');
         const copyBtn = document.getElementById('copy-btn');
         const iosHint = document.getElementById('ios-hint');
 
         if (isIOS) {
-            // iOS 环境：停止自动跳转，显示手动操作界面
             loadingText.style.display = 'none';
             copyBtn.style.display = 'flex';
             iosHint.style.display = 'block';
-            
         } else {
-            // 安卓 & PC 环境：执行自动跳转
             setTimeout(() => { 
                 window.location.href = targetLink; 
             }, 1000);
