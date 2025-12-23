@@ -70,23 +70,22 @@
             line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
         }
 
-        /* --- ID 区域交互优化 --- */
+        /* ID 显示区域 */
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
-            font-size: 12px; color: #999; font-family: monospace; 
+            font-size: 12px; color: #999; font-family: sans-serif;
             letter-spacing: 0.5px; font-style: italic;
-            cursor: pointer; /* 变成手型，提示可点击 */
-            position: relative;
+            cursor: pointer; position: relative;
         }
-        /* 点击时的反馈效果 */
-        .ref-id-box:active { color: #25D366; background-color: #f0fff4; border-radius: 4px; }
+        /* 点击反馈 */
+        .ref-id-box:active { background-color: #f5f5f5; border-radius: 4px; color: #666; }
         
         .ref-id-text { color: #666; font-weight: normal; user-select: all; }
-        
-        /* 复制成功的提示小气泡 */
+
+        /* 复制成功小提示 */
         #id-copy-tip {
-            position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
-            background: #333; color: #fff; padding: 4px 8px;
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px;
             border-radius: 4px; font-size: 10px; display: none;
             font-family: sans-serif; font-style: normal; white-space: nowrap;
         }
@@ -103,18 +102,15 @@
             Copy Sales WhatsApp
         </button>
         
-        <!-- iOS 提示语 (文案优化) -->
         <div id="ios-hint" class="ios-hint-text">
-            If WhatsApp fails to open, please:<br>
-            1. Click blue button to copy number & add friend.<br>
-            2. <b>Tap the ID below to copy</b> & send to us.
+            If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.
         </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
-        <!-- 底部 ID 显示 (点击可复制) -->
+        <!-- 底部 ID 显示 (点击触发 copyId) -->
         <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
-            <span id="id-copy-tip">ID Copied!</span>
+            <span id="id-copy-tip">Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
         </div>
     </div>
@@ -130,7 +126,6 @@
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
-            // 优化英文提示，引导复制ID
             hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             loading: "Redirecting...", copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras"
@@ -193,10 +188,9 @@
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
-    // 支持 HTML 内容 (innerHTML) 以显示换行和加粗
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
-    document.getElementById('ios-hint').innerHTML = t.hint; 
+    document.getElementById('ios-hint').innerHTML = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
     // --- 链接生成 ---
@@ -243,7 +237,6 @@
         }
     };
 
-    // 复制号码
     function copyNumber() {
         const tempInput = document.createElement("input");
         tempInput.value = "+" + finalNumber;
@@ -263,17 +256,16 @@
         }, 2000);
     }
 
-    // 【新增】复制 ID
+    // 【修改点】点击底部 ID 时，复制完整格式
     function copyId() {
         const tempInput = document.createElement("input");
-        // 复制的内容直接是 "Ref: XXX"，方便业务员识别
-        tempInput.value = "Ref: " + inquiryId;
+        // 核心修改：复制的内容包含前缀
+        tempInput.value = "INQUIRY ID : " + inquiryId;
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand("copy");
         document.body.removeChild(tempInput);
 
-        // 显示小气泡提示
         const tip = document.getElementById('id-copy-tip');
         tip.style.display = 'block';
         setTimeout(() => {
