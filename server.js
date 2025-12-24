@@ -60,7 +60,7 @@ app.post('/api/log', async (req, res) => {
 
         if (!supabase) return res.status(200).send({ success: false });
 
-        // 4. 写入数据库 (新增 inquiry_id)
+        // 4. 写入数据库 (新增 referrer_url)
         const { error } = await supabase
             .from('wa_logs')
             .insert({
@@ -71,7 +71,9 @@ app.post('/api/log', async (req, res) => {
                 city: city,
                 user_agent: ua,
                 language: logData.language || 'unknown',
-                inquiry_id: logData.inquiryId || 'N/A' // 【核心新增】写入询盘ID
+                inquiry_id: logData.inquiryId || 'N/A',
+                // 【核心新增】写入来源URL，如果没有则记为 'Direct'
+                referrer_url: logData.referrerUrl || 'Direct/Unknown'
             });
 
         if (error) throw error;
@@ -84,7 +86,7 @@ app.post('/api/log', async (req, res) => {
     }
 });
 
-// 查看日志页面 (新增 Inquiry ID 列)
+// 查看日志页面 (新增 Referrer 列)
 app.get('/api/logs', async (req, res) => {
     if (!supabase) return res.send('Config Error');
     if (req.query.pwd !== '123456') return res.send('🔒 Password Error');
@@ -100,28 +102,30 @@ app.get('/api/logs', async (req, res) => {
         
         let html = `<html><head><meta charset="UTF-8"><title>Data</title>
         <style>
-            body{font-family:sans-serif;padding:20px;font-size:13px;}
+            body{font-family:sans-serif;padding:20px;font-size:12px;}
             table{width:100%;border-collapse:collapse;}
-            th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+            th,td{border:1px solid #ddd;padding:6px;text-align:left;}
             tr:nth-child(even){background:#f9f9f9;}
-            .id-col {font-family:monospace; color:#d63384; font-weight:bold;}
+            .ref-col {max-width: 150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
         </style></head><body>
         <h2>User Logs</h2>
         <table>
             <tr>
-                <th>Time (BJ)</th>
-                <th>Inquiry ID</th> <!-- 新增 -->
+                <th>Time</th>
+                <th>Inquiry ID</th>
                 <th>Lang</th>
                 <th>Loc</th>
+                <th>Source (Referrer)</th> <!-- 新增 -->
                 <th>WA</th>
                 <th>IP</th>
             </tr>
         ${logs.map(log => `
             <tr>
                 <td>${log.redirect_time}</td>
-                <td class="id-col">${log.inquiry_id || '-'}</td> <!-- 显示ID -->
+                <td>${log.inquiry_id || '-'}</td>
                 <td>${log.language || '-'}</td>
                 <td>${log.country}/${log.city}</td>
+                <td class="ref-col" title="${log.referrer_url}">${log.referrer_url || '-'}</td>
                 <td>${log.phone_number}</td>
                 <td>${log.ip}</td>
             </tr>`).join('')}
