@@ -64,20 +64,20 @@
         
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
+        /* 提示语样式 */
         .ios-hint-text {
             font-size: 13px; color: #d93025; background-color: #fff8f8;
             padding: 12px; border-radius: 8px; margin-top: 20px;
             line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
         }
 
+        /* ID 显示区域 */
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
             font-size: 12px; color: #999; font-family: sans-serif;
             letter-spacing: 0.5px; font-style: italic;
             cursor: pointer; position: relative;
         }
-        .ref-id-box:active { background-color: #f5f5f5; border-radius: 4px; }
-        
         .ref-id-text { color: #666; font-weight: normal; user-select: all; }
 
         #id-copy-tip {
@@ -99,12 +99,12 @@
             Copy Sales WhatsApp
         </button>
         
-        <div id="ios-hint" class="ios-hint-text">
-            <!-- 这里的文字会由 JS 动态生成 -->
-        </div>
+        <!-- 这里是提示语容器 -->
+        <div id="ios-hint" class="ios-hint-text"></div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
+        <!-- 底部 ID 显示 -->
         <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
             <span id="id-copy-tip">Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
@@ -119,14 +119,14 @@
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // --- 语言包升级：新增 hintFallback (兜底提示) ---
+    // --- 语言包升级：文案大一统 ---
+    // hintFallback 现在和 hint 完全一致，确保体验统一
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
-            // 场景A：iOS Messenger 专用 (被拦截)
+            // 统一文案：如果打不开，请复制号码和ID
             hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
-            // 场景B：PC/Android (自动跳转失败)
-            hintFallback: "Automatic jump failed?<br>Please copy the sales number below and add manually.",
+            hintFallback: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             loading: "Redirecting...", copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras",
             msgWarning: "(Do not delete)"
@@ -134,7 +134,7 @@
         'ru': {
             openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
             hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
-            hintFallback: "Автопереход не сработал?<br>Пожалуйста, скопируйте номер ниже и добавьте вручную.",
+            hintFallback: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
             loading: "Перенаправление...", copied: "Скопировано! ✅",
             message: "Здравствуйте, я хочу узнать о тепловизионных камерах",
             msgWarning: "(Не удалять)"
@@ -142,7 +142,7 @@
         'es': {
             openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
             hint: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
-            hintFallback: "¿Falló el salto automático?<br>Copie el número de abajo y agréguelo manualmente.",
+            hintFallback: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
             loading: "Redirigiendo...", copied: "¡Copiado! ✅",
             message: "Hola, quiero consultar sobre cámaras termográficas",
             msgWarning: "(No borrar)"
@@ -150,7 +150,7 @@
         'ar': {
             openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
             hint: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
-            hintFallback: "فشل الانتقال التلقائي؟<br>يرجى نسخ الرقم أدناه وإضافته يدوياً.",
+            hintFallback: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
             loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
             message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية",
             msgWarning: "(لا تحذف)"
@@ -197,7 +197,7 @@
 
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
-    // 默认先不填提示语，由 JS 决定
+    document.getElementById('ios-hint').innerHTML = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
     window.onload = function() {
@@ -233,27 +233,26 @@
         const iosHint = document.getElementById('ios-hint');
 
         if (isIOS) {
-            // === 场景 1：iOS Messenger (直接显示手动模式) ===
+            // 场景 1: iOS
             loadingText.style.display = 'none';
             copyBtn.style.display = 'flex';
-            iosHint.innerHTML = t.hint; // 使用 "If WhatsApp fails..."
+            iosHint.innerHTML = t.hint; // 使用标准文案
             iosHint.style.display = 'block';
         } else {
-            // === 场景 2：安卓/PC (尝试自动跳转) ===
+            // 场景 2: 安卓/PC
             
-            // 2.1 立即执行跳转
+            // A. 尝试自动跳转
             setTimeout(() => { 
+                // 记得测试完把这两条斜杠去掉 ↓
                 window.location.href = targetLink; 
             }, 1000);
 
-            // 2.2 【新增】兜底逻辑 (延迟 2.5秒执行)
-            // 如果 2.5秒后用户还在页面上，说明跳转大概率失败了（如未安装APP/被拦截）
-            // 此时自动弹出手动复制界面
+            // B. 失败兜底
             setTimeout(() => {
                 loadingText.style.display = 'none';
-                copyBtn.style.display = 'flex'; // 显示复制按钮
-                iosHint.innerHTML = t.hintFallback; // 使用 "自动跳转失败？"
-                iosHint.style.display = 'block'; // 显示红色提示
+                copyBtn.style.display = 'flex'; 
+                iosHint.innerHTML = t.hintFallback; // 使用相同的标准文案
+                iosHint.style.display = 'block'; 
             }, 2500);
         }
     };
