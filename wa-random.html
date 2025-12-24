@@ -70,10 +70,10 @@
             line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
         }
 
-        /* ID 显示区域 */
+        /* 页面底部 ID 显示 (保持干净，不加红色警告，因为已经加到对话框里了) */
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
-            font-size: 12px; color: #999; font-family: sans-serif;
+            font-size: 12px; color: #999; font-family: monospace; 
             letter-spacing: 0.5px; font-style: italic;
             cursor: pointer; position: relative;
         }
@@ -81,19 +81,8 @@
         
         .ref-id-text { color: #666; font-weight: normal; user-select: all; }
 
-        /* --- 新增：勿删提示语样式 --- */
-        .id-warning {
-            display: block; /* 强制换行 */
-            font-size: 10px;
-            color: #ff6b6b; /* 柔和的红色 */
-            margin-top: 6px;
-            font-style: normal; /* 不倾斜 */
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            opacity: 0.9;
-        }
-
         #id-copy-tip {
-            position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px;
             border-radius: 4px; font-size: 10px; display: none;
             font-family: sans-serif; font-style: normal; white-space: nowrap;
@@ -117,13 +106,10 @@
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
-        <!-- 底部 ID 显示 + 警告提示 -->
+        <!-- 底部 ID 显示 -->
         <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
             <span id="id-copy-tip">Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
-            
-            <!-- 【新增】防删除提示语 -->
-            <span id="ref-warning" class="id-warning"></span>
         </div>
     </div>
 
@@ -135,35 +121,35 @@
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // --- 语言包升级：增加 warning 字段 ---
+    // --- 语言包升级：增加了 msgWarning (极简提示) ---
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
             hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             loading: "Redirecting...", copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras",
-            warning: "( Please do not delete this ID )" // 英文提示
+            msgWarning: "(Do not delete)"
         },
         'ru': {
             openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
             hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
             loading: "Перенаправление...", copied: "Скопировано! ✅",
             message: "Здравствуйте, я хочу узнать о тепловизионных камерах",
-            warning: "( Пожалуйста, не удаляйте этот ID )" // 俄语提示
+            msgWarning: "(Не удалять)"
         },
         'es': {
             openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
             hint: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
             loading: "Redirigiendo...", copied: "¡Copiado! ✅",
             message: "Hola, quiero consultar sobre cámaras termográficas",
-            warning: "( Por favor no borre este ID )" // 西语提示
+            msgWarning: "(No borrar)"
         },
         'ar': {
             openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
             hint: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
             loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
             message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية",
-            warning: "( يرجى عدم حذف هذا المعرف )" // 阿拉伯语提示
+            msgWarning: "(لا تحذف)"
         }
     };
 
@@ -204,16 +190,13 @@
 
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
-    
-    // 【新增】显示警告语
-    document.getElementById('ref-warning').innerText = t.warning;
 
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
     document.getElementById('ios-hint').innerHTML = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    // --- 链接生成 ---
+    // --- 链接生成 (带文案提示) ---
     window.onload = function() {
         const logData = { 
             phoneNumber: finalNumber, 
@@ -226,8 +209,14 @@
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
+        // 1. 空行
         const spacer = "\n\n"; 
-        const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + "_";
+        
+        // 2. 格式: 分割线 + 斜体 (ID + 提示语)
+        // 效果: ─────
+        //      _INQUIRY ID : REF-XXXX (Do not delete)_
+        const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + " " + t.msgWarning + "_";
+        
         const finalMessageText = `${t.message}${spacer}${idFormat}`; 
         const encodedMessage = encodeURIComponent(finalMessageText);
         
@@ -278,8 +267,8 @@
 
     function copyId() {
         const tempInput = document.createElement("input");
-        // 点击这里时，只复制 ID (含前缀)，不复制警告语
-        tempInput.value = "INQUIRY ID : " + inquiryId;
+        // 复制内容也带上提示，保持一致
+        tempInput.value = "INQUIRY ID : " + inquiryId + " " + t.msgWarning;
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand("copy");
