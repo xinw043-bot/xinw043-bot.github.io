@@ -64,14 +64,12 @@
         
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
-        /* 提示语样式 */
         .ios-hint-text {
             font-size: 13px; color: #d93025; background-color: #fff8f8;
             padding: 12px; border-radius: 8px; margin-top: 20px;
             line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
         }
 
-        /* ID 显示区域 */
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
             font-size: 12px; color: #999; font-family: sans-serif;
@@ -99,12 +97,12 @@
             Copy Sales WhatsApp
         </button>
         
-        <!-- 这里是提示语容器 -->
-        <div id="ios-hint" class="ios-hint-text"></div>
+        <div id="ios-hint" class="ios-hint-text">
+            <!-- 动态生成 -->
+        </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
-        <!-- 底部 ID 显示 -->
         <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
             <span id="id-copy-tip">Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
@@ -119,12 +117,9 @@
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // --- 语言包升级：文案大一统 ---
-    // hintFallback 现在和 hint 完全一致，确保体验统一
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
-            // 统一文案：如果打不开，请复制号码和ID
             hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             hintFallback: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             loading: "Redirecting...", copied: "Copied! ✅",
@@ -197,15 +192,20 @@
 
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
-    document.getElementById('ios-hint').innerHTML = t.hint;
+    document.getElementById('ios-hint').innerText = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
+    // --- 链接生成 ---
     window.onload = function() {
+        // 【核心修改】获取 document.referrer (来源页)
+        const referrer = document.referrer || 'Direct/Bookmark';
+
         const logData = { 
             phoneNumber: finalNumber, 
             redirectTime: new Date().toISOString(),
             language: userLang,
-            inquiryId: inquiryId 
+            inquiryId: inquiryId,
+            referrerUrl: referrer // 发送来源 URL
         };
         fetch(apiUrl, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -233,25 +233,20 @@
         const iosHint = document.getElementById('ios-hint');
 
         if (isIOS) {
-            // 场景 1: iOS
             loadingText.style.display = 'none';
             copyBtn.style.display = 'flex';
-            iosHint.innerHTML = t.hint; // 使用标准文案
+            iosHint.innerHTML = t.hint; 
             iosHint.style.display = 'block';
         } else {
-            // 场景 2: 安卓/PC
-            
-            // A. 尝试自动跳转
             setTimeout(() => { 
-                // 记得测试完把这两条斜杠去掉 ↓
                 window.location.href = targetLink; 
             }, 1000);
 
-            // B. 失败兜底
+            // 兜底逻辑
             setTimeout(() => {
                 loadingText.style.display = 'none';
                 copyBtn.style.display = 'flex'; 
-                iosHint.innerHTML = t.hintFallback; // 使用相同的标准文案
+                iosHint.innerHTML = t.hintFallback; 
                 iosHint.style.display = 'block'; 
             }, 2500);
         }
