@@ -70,10 +70,9 @@
             line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
         }
 
-        /* 页面底部 ID 显示 (保持干净，不加红色警告，因为已经加到对话框里了) */
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
-            font-size: 12px; color: #999; font-family: monospace; 
+            font-size: 12px; color: #999; font-family: sans-serif;
             letter-spacing: 0.5px; font-style: italic;
             cursor: pointer; position: relative;
         }
@@ -101,12 +100,11 @@
         </button>
         
         <div id="ios-hint" class="ios-hint-text">
-            If WhatsApp fails to open, please click the blue button above to copy the sales number, then add it manually to continue business.
+            <!-- 这里的文字会由 JS 动态生成 -->
         </div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
-        <!-- 底部 ID 显示 -->
         <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
             <span id="id-copy-tip">Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
@@ -121,11 +119,14 @@
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // --- 语言包升级：增加了 msgWarning (极简提示) ---
+    // --- 语言包升级：新增 hintFallback (兜底提示) ---
     const translations = {
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
+            // 场景A：iOS Messenger 专用 (被拦截)
             hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
+            // 场景B：PC/Android (自动跳转失败)
+            hintFallback: "Automatic jump failed?<br>Please copy the sales number below and add manually.",
             loading: "Redirecting...", copied: "Copied! ✅",
             message: "Hi, I want to inquire about thermal imaging cameras",
             msgWarning: "(Do not delete)"
@@ -133,6 +134,7 @@
         'ru': {
             openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
             hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
+            hintFallback: "Автопереход не сработал?<br>Пожалуйста, скопируйте номер ниже и добавьте вручную.",
             loading: "Перенаправление...", copied: "Скопировано! ✅",
             message: "Здравствуйте, я хочу узнать о тепловизионных камерах",
             msgWarning: "(Не удалять)"
@@ -140,6 +142,7 @@
         'es': {
             openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
             hint: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
+            hintFallback: "¿Falló el salto automático?<br>Copie el número de abajo y agréguelo manualmente.",
             loading: "Redirigiendo...", copied: "¡Copiado! ✅",
             message: "Hola, quiero consultar sobre cámaras termográficas",
             msgWarning: "(No borrar)"
@@ -147,6 +150,7 @@
         'ar': {
             openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
             hint: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
+            hintFallback: "فشل الانتقال التلقائي؟<br>يرجى نسخ الرقم أدناه وإضافته يدوياً.",
             loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
             message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية",
             msgWarning: "(لا تحذف)"
@@ -193,10 +197,9 @@
 
     document.getElementById('wa-link').innerText = t.openBtn;
     document.getElementById('copy-btn').innerText = t.copyBtn;
-    document.getElementById('ios-hint').innerHTML = t.hint;
+    // 默认先不填提示语，由 JS 决定
     document.getElementById('loading-text').innerText = t.loading;
 
-    // --- 链接生成 (带文案提示) ---
     window.onload = function() {
         const logData = { 
             phoneNumber: finalNumber, 
@@ -209,14 +212,8 @@
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
-        // 1. 空行
         const spacer = "\n\n"; 
-        
-        // 2. 格式: 分割线 + 斜体 (ID + 提示语)
-        // 效果: ─────
-        //      _INQUIRY ID : REF-XXXX (Do not delete)_
         const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + " " + t.msgWarning + "_";
-        
         const finalMessageText = `${t.message}${spacer}${idFormat}`; 
         const encodedMessage = encodeURIComponent(finalMessageText);
         
@@ -236,13 +233,28 @@
         const iosHint = document.getElementById('ios-hint');
 
         if (isIOS) {
+            // === 场景 1：iOS Messenger (直接显示手动模式) ===
             loadingText.style.display = 'none';
             copyBtn.style.display = 'flex';
+            iosHint.innerHTML = t.hint; // 使用 "If WhatsApp fails..."
             iosHint.style.display = 'block';
         } else {
+            // === 场景 2：安卓/PC (尝试自动跳转) ===
+            
+            // 2.1 立即执行跳转
             setTimeout(() => { 
                 window.location.href = targetLink; 
             }, 1000);
+
+            // 2.2 【新增】兜底逻辑 (延迟 2.5秒执行)
+            // 如果 2.5秒后用户还在页面上，说明跳转大概率失败了（如未安装APP/被拦截）
+            // 此时自动弹出手动复制界面
+            setTimeout(() => {
+                loadingText.style.display = 'none';
+                copyBtn.style.display = 'flex'; // 显示复制按钮
+                iosHint.innerHTML = t.hintFallback; // 使用 "自动跳转失败？"
+                iosHint.style.display = 'block'; // 显示红色提示
+            }, 2500);
         }
     };
 
@@ -267,7 +279,6 @@
 
     function copyId() {
         const tempInput = document.createElement("input");
-        // 复制内容也带上提示，保持一致
         tempInput.value = "INQUIRY ID : " + inquiryId + " " + t.msgWarning;
         document.body.appendChild(tempInput);
         tempInput.select();
