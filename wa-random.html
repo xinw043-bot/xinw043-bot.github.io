@@ -72,10 +72,12 @@
 
         .ref-id-box {
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
-            font-size: 12px; color: #999; font-family: monospace; 
+            font-size: 12px; color: #999; font-family: sans-serif;
             letter-spacing: 0.5px; font-style: italic;
             cursor: pointer; position: relative;
         }
+        .ref-id-box:active { background-color: #f5f5f5; border-radius: 4px; color: #666; }
+        
         .ref-id-text { color: #666; font-weight: normal; user-select: all; }
 
         #id-copy-tip {
@@ -97,9 +99,7 @@
             Copy Sales WhatsApp
         </button>
         
-        <div id="ios-hint" class="ios-hint-text">
-            <!-- JS 填充 -->
-        </div>
+        <div id="ios-hint" class="ios-hint-text"></div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
@@ -117,37 +117,51 @@
     
     const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
+    // --- 语言包升级：新增波兰语 + 更新招呼语 ---
     const translations = {
+        // 默认 (英语)
         'en': {
             openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
             hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             hintFallback: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
             loading: "Redirecting...", copied: "Copied! ✅",
-            message: "Hi, I want to inquire about thermal imaging cameras",
+            message: "Hi, I saw your ad . Can I get a catalog/price list?", // 已更新
             msgWarning: "(Do not delete)"
         },
+        // 俄语
         'ru': {
             openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
             hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
             hintFallback: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
             loading: "Перенаправление...", copied: "Скопировано! ✅",
-            message: "Здравствуйте, я хочу узнать о тепловизионных камерах",
+            message: "Здравствуйте, я видел вашу рекламу. Можно получить каталог/прайс-лист?", // 已更新
             msgWarning: "(Не удалять)"
         },
+        // 波兰语 (新增)
+        'pl': {
+            openBtn: "Otwórz WhatsApp", copyBtn: "Kopiuj numer sprzedaży",
+            hint: "Jeśli WhatsApp się nie otwiera:<br>1. Skopiuj numer (niebieski przycisk).<br>2. <b>Kliknij ID poniżej</b>, aby skopiować i wyślij do nas.",
+            hintFallback: "Jeśli WhatsApp się nie otwiera:<br>1. Skopiuj numer (niebieski przycisk).<br>2. <b>Kliknij ID poniżej</b>, aby skopiować i wyślij do nas.",
+            loading: "Przekierowanie...", copied: "Skopiowano! ✅",
+            message: "Cześć, widziałem Waszą reklamę. Czy mogę prosić o katalog/cennik?", // 专门适配
+            msgWarning: "(Nie usuwać)"
+        },
+        // 西班牙语
         'es': {
             openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
             hint: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
             hintFallback: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
             loading: "Redirigiendo...", copied: "¡Copiado! ✅",
-            message: "Hola, quiero consultar sobre cámaras termográficas",
+            message: "Hola, vi su anuncio. ¿Podría enviarme un catálogo/lista de precios?", // 已更新
             msgWarning: "(No borrar)"
         },
+        // 阿拉伯语
         'ar': {
             openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
             hint: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
             hintFallback: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
             loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
-            message: "مرحبًا، أريد الاستفسار عن الكاميرات الحرارية",
+            message: "مرحبًا، رأيت إعلانكم. هل يمكنني الحصول على الكتالوج/قائمة الأسعار؟", // 已更新
             msgWarning: "(لا تحذف)"
         }
     };
@@ -170,6 +184,8 @@
     if (translations[userLang]) {
         currentLang = userLang;
         if (userLang === 'ru') currentPool = ruNumbers;
+        // 波兰语暂无专属销售，走默认英语池
+        else if (userLang === 'pl') currentPool = defaultNumbers; 
         else if (userLang === 'es') currentPool = esNumbers;
         else if (userLang === 'ar') currentPool = arNumbers;
     }
@@ -195,26 +211,15 @@
     document.getElementById('ios-hint').innerHTML = t.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    // --- 核心逻辑：精准识别来源 ---
     window.onload = function() {
-        // 1. 获取 User Agent 字符串
         const ua = navigator.userAgent;
-        
-        // 2. 默认使用 document.referrer
         let finalReferrer = document.referrer;
-
-        // 3. 增强检测：如果 Referrer 是空的或者泛指 Facebook，尝试用 UA 纠正
         if (ua.includes("Instagram")) {
             finalReferrer = "Instagram App";
         } else if (ua.includes("FBAN") || ua.includes("FBAV") || ua.includes("Messenger")) {
-            // FBAN/FBAV 是 Facebook 系 App 的通用标识
-            if (ua.includes("Messenger")) {
-                finalReferrer = "Messenger App";
-            } else {
-                finalReferrer = "Facebook App";
-            }
+            if (ua.includes("Messenger")) finalReferrer = "Messenger App";
+            else finalReferrer = "Facebook App";
         }
-        
         if (!finalReferrer) finalReferrer = "Direct/Unknown";
 
         const logData = { 
@@ -222,14 +227,13 @@
             redirectTime: new Date().toISOString(),
             language: userLang,
             inquiryId: inquiryId,
-            referrerUrl: finalReferrer // 发送精准来源
+            referrerUrl: finalReferrer 
         };
         fetch(apiUrl, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(logData), keepalive: true 
         }).catch(console.error);
 
-        // --- 链接生成 & 跳转 ---
         const spacer = "\n\n"; 
         const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + " " + t.msgWarning + "_";
         const finalMessageText = `${t.message}${spacer}${idFormat}`; 
