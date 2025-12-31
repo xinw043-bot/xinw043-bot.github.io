@@ -5,7 +5,6 @@ const app = express();
 
 app.use(bodyParser.json());
 
-// --- Supabase 初始化 ---
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 let supabase = null;
@@ -13,13 +12,9 @@ let supabase = null;
 if (supabaseUrl && supabaseKey) {
     try {
         supabase = createClient(supabaseUrl, supabaseKey);
-        console.log("✅ Supabase 客户端初始化成功");
-    } catch (e) {
-        console.error("❌ Supabase 初始化失败:", e.message);
-    }
+    } catch (e) {}
 }
 
-// --- 工具函数：获取北京时间 ---
 function getBeijingTime() {
     return new Date().toLocaleString('zh-CN', {
         timeZone: 'Asia/Shanghai',
@@ -29,60 +24,67 @@ function getBeijingTime() {
     }).replace(/\//g, '-'); 
 }
 
-// --- 跨域配置 (允许 GitHub Pages 和 Shopify 访问) ---
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     next();
 });
 
 // ==========================================
-// 接口 1: 检查 IP 历史 (实现全域号码锁定)
+// 接口 1: 全局 IP 查重 (核心升级)
 // ==========================================
 app.get('/api/check-phone', async (req, res) => {
     try {
         if (!supabase) return res.json({ found: false });
 
-        // 获取真实 IP
         const visitorIP = req.headers['x-forwarded-for'] 
             ? req.headers['x-forwarded-for'].split(',')[0] 
             : req.ip;
 
-        // 策略：为了保证跨平台一致性，我们需要先后查询两张表
-        
-        // 1. 先查 wa_logs (GitHub 中间页历史)
-        const { data: waData, error: waError } = await supabase
-            .from('wa_logs')
+        // 优先级 1: 查 Telegram 记录 (tg_logs)
+        // 如果他以前点过 TG，优先保持 TG 号码一致
+        const { data: tgData } = await supabase
+            .from('tg_logs')
             .select('phone_number')
             .eq('ip', visitorIP)
-            .order('id', { ascending: false }) // 取最新的一条
-            .limit(1);
+            .order('id', { ascending: false }).limit(1);
 
-        if (!waError && waData && waData.length > 0 && waData[0].phone_number) {
-            console.log(`[查重] IP ${visitorIP} 在 wa_logs 发现旧号码: ${waData[0].phone_number}`);
-            return res.json({ found: true, phone: waData[0].phone_number });
+        if (tgData && tgData.length > 0 && tgData[0].phone_number) {
+            console.log(`[锁定] IP ${visitorIP} 命中 TG 历史: ${tgData[0].phone_number}`);
+            return res.json({ found: true, phone: tgData[0].phone_number, source: 'tg' });
         }
 
-        // 2. 如果没找到，再查 website_logs (Shopify 官网历史)
-        const { data: webData, error: webError } = await supabase
+        // 优先级 2: 查 官网 WhatsApp 记录 (website_logs)
+        // 如果没点过 TG，但点过官网 WA，让他去加这个 WA 号码对应的 TG
+        const { data: webData } = await supabase
             .from('website_logs')
             .select('phone_number')
             .eq('ip', visitorIP)
-            .order('id', { ascending: false })
-            .limit(1);
+            .order('id', { ascending: false }).limit(1);
 
-        if (!webError && webData && webData.length > 0 && webData[0].phone_number) {
-            console.log(`[查重] IP ${visitorIP} 在 website_logs 发现旧号码: ${webData[0].phone_number}`);
-            return res.json({ found: true, phone: webData[0].phone_number });
+        if (webData && webData.length > 0 && webData[0].phone_number) {
+            console.log(`[锁定] IP ${visitorIP} 命中 Website WA 历史: ${webData[0].phone_number}`);
+            return res.json({ found: true, phone: webData[0].phone_number, source: 'website' });
         }
 
-        // 3. 两边都没来过，这是纯新客
+        // 优先级 3: 查 中间页 WhatsApp 记录 (wa_logs)
+        const { data: waData } = await supabase
+            .from('wa_logs')
+            .select('phone_number')
+            .eq('ip', visitorIP)
+            .order('id', { ascending: false }).limit(1);
+
+        if (waData && waData.length > 0 && waData[0].phone_number) {
+            console.log(`[锁定] IP ${visitorIP} 命中 Landing WA 历史: ${waData[0].phone_number}`);
+            return res.json({ found: true, phone: waData[0].phone_number, source: 'landing' });
+        }
+
+        // 纯新客
         return res.json({ found: false });
 
     } catch (error) {
         console.error('Check IP Error:', error.message);
-        res.json({ found: false }); // 出错放行，避免阻塞
+        res.json({ found: false });
     }
 });
 
@@ -95,44 +97,32 @@ app.post('/api/log', async (req, res) => {
         const ua = req.get('User-Agent') || '';
         const uaLower = ua.toLowerCase();
         
-        // --- 1. 决定存入哪张表 ---
-        // 如果前端带了 is_website: true (Shopify)，存 website_logs
-        // 否则 (GitHub 中间页)，存 wa_logs
-        const tableName = logData.is_website ? 'website_logs' : 'wa_logs';
+        // 1. 决定存入哪张表
+        let tableName = 'wa_logs'; // 默认
+        if (logData.is_telegram) tableName = 'tg_logs';
+        else if (logData.is_website) tableName = 'website_logs';
 
-        // --- 2. 爬虫拦截 (V3.1 VPN 友好版) ---
-        // 允许 VPN/数据中心 IP，但拦截明确的爬虫 UA
-        const botKeywords = [
-            'bot', 'spider', 'crawl', 
-            'facebook', 'meta', 'whatsapp', 'preview', 
-            'google', 'twitter', 'slack', 'ahrefs', 'pinterest', 'python'
-        ];
+        // 2. 爬虫拦截
+        const botKeywords = ['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'python'];
         const isNamedBot = botKeywords.some(keyword => uaLower.includes(keyword));
-        const isMetaFingerprint = ua.includes('Android 10; K'); // Meta 爬虫特征
+        const isMetaFingerprint = ua.includes('Android 10; K');
 
         if (isNamedBot || isMetaFingerprint) {
-            console.log(`🛡️ 拦截爬虫 | Table: ${tableName} | UA: ${ua.substring(0, 30)}...`);
             return res.status(200).send({ success: true, skipped: true });
         }
 
-        // --- 3. 获取地理位置与时间 ---
+        // 3. 准备数据
         const country = req.headers['x-vercel-ip-country'] || 'Unknown';
         let city = req.headers['x-vercel-ip-city'] || 'Unknown';
         try { city = decodeURIComponent(city); } catch (e) {}
-        
-        const visitorIP = req.headers['x-forwarded-for'] 
-            ? req.headers['x-forwarded-for'].split(',')[0] 
-            : req.ip;
-            
+        const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         const bjTime = getBeijingTime();
 
-        if (!supabase) return res.status(200).send({ success: false, msg: "DB Config Missing" });
+        if (!supabase) return res.status(200).send({ success: false });
 
-        // --- 4. 执行写入 ---
-        console.log(`[写入] Table: ${tableName} | IP: ${visitorIP} | Phone: ${logData.phoneNumber}`);
-        
+        // 4. 写入
         const { error } = await supabase
-            .from(tableName) // 动态选择表名
+            .from(tableName)
             .insert({
                 phone_number: logData.phoneNumber,
                 redirect_time: bjTime,
@@ -146,44 +136,24 @@ app.post('/api/log', async (req, res) => {
             });
 
         if (error) throw error;
-
         res.status(200).send({ success: true });
-
     } catch (error) {
-        console.error('SERVER_ERROR:', error.message);
-        // 即使报错也返回 200，避免前端 JS 报错影响用户体验
         res.status(200).send({ success: false });
     }
 });
 
-// ==========================================
-// 接口 3: 后台查看 (支持切换表格)
-// ==========================================
+// 接口 3: 查看日志 (保留)
 app.get('/api/logs', async (req, res) => {
     if (!supabase) return res.send('Config Error');
     if (req.query.pwd !== '123456') return res.send('🔒 Password Error');
-
-    // 通过 ?table=website 参数切换查看 website_logs
-    const tableName = req.query.table === 'website' ? 'website_logs' : 'wa_logs';
-
+    let tableName = 'wa_logs';
+    if (req.query.table === 'website') tableName = 'website_logs';
+    if (req.query.table === 'tg') tableName = 'tg_logs';
     try {
-        const { data: logs, error } = await supabase
-            .from(tableName)
-            .select('*')
-            .order('id', { ascending: false })
-            .limit(50);
-
+        const { data: logs, error } = await supabase.from(tableName).select('*').order('id', { ascending: false }).limit(50);
         if (error) throw error;
-        
-        // 返回 JSON 数据方便查看
-        res.json({
-            current_table: tableName,
-            count: logs.length,
-            logs: logs
-        });
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
+        res.json(logs);
+    } catch (error) { res.status(500).send(error.message); }
 });
 
 module.exports = app;
