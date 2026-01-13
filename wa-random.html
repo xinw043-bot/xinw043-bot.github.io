@@ -20,8 +20,8 @@
 
         /* Telegram 主题 */
         body.mode-tg .btn-primary { background-color: #0088cc; }
-        body.mode-tg .btn-copy { background-color: #555; } /* TG模式下复制按钮用深灰色区分 */
-        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 8px rgba(0, 136, 204, 0.2)); }
+        body.mode-tg .btn-copy { background-color: #555; } /* 灰色按钮保持不变 */
+        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 8px rgba(0, 136, 204, 0.3)); }
 
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
@@ -44,7 +44,7 @@
         
         <!-- 按钮 B: 复制账号 -->
         <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyAccount()">
-            Copy Sales WhatsApp
+            Copy Sales Account
         </button>
         
         <!-- iOS 提示语 -->
@@ -70,11 +70,11 @@
 
     const API_URL = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // WA 图标 (SVG Base64)
+    // WA 图标 (保持原版)
     const ICON_WA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+";
     
-    // TG 图标 (SVG Base64)
-    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwODhjYyI+PHBhdGggZD0iTTEyIDBDNS4zNzMgMCAwIDUuMzczIDAgMTJzNS4zNzMgMTIgMTIgMTIgMTItNS4zNzMgMTItMTJTMTguNjI3IDAgMTIgMHptNS41NjIgOC4xNjFjLS4xOCAxLjg5Ny0uOTYyIDYuNTAyLTEuMzU5IDguNjI3LS4xNjguOS0uNSAxLjIwMS0uODIgMS4yMy0uNjk3LjA2NC0xLjIyNi0uNDYxLTEuOTAxLS45MDMtMS4wNTYtLjY5Mi0xLjY1My0xLjEyMy0yLjY3OC0xLjc5OS0xLjE4NS0uNzgxLS40MTctMS4yMS4yNTgtMS45MTEuMTc3LS4xODQgMy4yNDctMi45NzcgMy4zMDctMy4yMy4wMDctLjAzMi4wMTQtLjE1LS4wNTYtLjIxMnMtLjE3NC0uMDQxLS4yNDktLjAyNGMtLjEwNi4wMjQtMS43OTMgMS4xMzktNS4wNjIgMy4zNDUtLjQ3OS4zMjktLjkxMy40ODktMS4zMDIuNDgxLS40MjgtLjAwOS0xLjI1Mi0uMjQyLTEuODY1LS40NDItLjc1Mi0uMjQ0LTEuMzQ5LS4zNzQtMS4yOTctLjc4OS4wMjctLjIxNi4zMjUtLjQzNy44OTMtLjY2MyAzLjQ5OC0xLjUyNCA1LjgzMS0yLjUyOSA2Ljk5OC0zLjAxNCAzLjMzMi0xLjM4NiA0LjAyNS0xLjYyNyA0LjQ3Ni0xLjYzNS4wOTktLjAwMi4zMjEuMDIzLjQ2NS4xNDEuMTIxLjA5OS4xNTUuMjMyLjE3MS4zMjYuMDE2LjA5NC4wMzYuMzA4LjAyLjQ3NXoiIGZpbGw9IndoaXRlIi8+PC9zdmc+";
+    // 【修改点 1】TG 图标 (替换为官方蓝底白飞机的 SVG Base64)
+    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIj48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxMjAiIHI9IjEyMCIgZmlsbD0iIzI0QTFERSIvPjxwYXRoIGZpbGw9IiNGRkYiIGQ9Ik01NCAxMThsMzIgMTIgMTEgMzYgMTAtMjcgNDgtNDMtNjAgNDgtMyAyNiA4NCAyNUwyMTMgNDZ6Ii8+PC9zdmc+";
 
     // 多语言文案 (支持两种模式)
     const TEXT = {
@@ -83,7 +83,8 @@
             'ru': { btn: "Открыть WhatsApp", copy: "Скопировать номер", hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
         'tg': {
-            'en': { btn: "Open Telegram", copy: "Copy Telegram Username", hint: "If Telegram fails to open:<br>1. Copy username (Gray Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
+            // 【修改点 2】文案更新为 Copy Sales Account
+            'en': { btn: "Open Telegram", copy: "Copy Sales Account", hint: "If Telegram fails to open:<br>1. Copy username (Gray Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
             'ru': { btn: "Открыть Telegram", copy: "Скопировать имя", hint: "Если не открывается:<br>1. Скопируйте имя выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
         // 通用
@@ -97,21 +98,16 @@
 
     // --- 逻辑开始 ---
     
-    // 1. 获取 URL 参数 ?channel=tg
     const urlParams = new URLSearchParams(window.location.search);
-    const mode = urlParams.get('channel') === 'tg' ? 'tg' : 'wa'; // 默认为 wa
+    const mode = urlParams.get('channel') === 'tg' ? 'tg' : 'wa'; 
     
-    // 切换主题类名
     document.body.className = `mode-${mode}`;
-    
-    // 设置图标
     document.getElementById('main-icon').src = mode === 'tg' ? ICON_TG : ICON_WA;
 
-    // 2. 基础函数
     function generateInquiryId() {
-        let id = localStorage.getItem('wa_inquiry_id'); // 共用同一个 ID 存储
+        let id = localStorage.getItem('wa_inquiry_id'); 
         if (!id) {
-            const prefix = mode === 'tg' ? 'TG-REF-' : 'REF-'; // 其实可以统一，这里保持兼容
+            const prefix = mode === 'tg' ? 'TG-REF-' : 'REF-'; 
             id = `REF-${Date.now().toString().slice(-4)}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
             localStorage.setItem('wa_inquiry_id', id);
         }
@@ -119,7 +115,7 @@
     }
 
     const userLang = (navigator.language || 'en').substring(0, 2).toLowerCase();
-    const langKey = TEXT['common'][userLang] ? userLang : 'en'; // 语言回退
+    const langKey = TEXT['common'][userLang] ? userLang : 'en'; 
     const t = TEXT['common'][langKey];
     const t_mode = TEXT[mode][langKey] || TEXT[mode]['en'];
 
@@ -128,7 +124,6 @@
         document.querySelector('.ios-hint-text').style.textAlign = 'right';
     }
 
-    // 3. 号码分配
     let finalAccount = localStorage.getItem(`assigned_${mode}`);
     if (!finalAccount) {
         if (mode === 'wa') {
@@ -143,16 +138,13 @@
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
-    // 4. 更新界面文案
     document.getElementById('link-btn').innerText = t_mode.btn;
     document.getElementById('copy-btn').innerText = t_mode.copy;
     document.getElementById('ios-hint').innerHTML = t_mode.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    // 5. 生成链接
     let targetLink;
     if (mode === 'wa') {
-        // WhatsApp 逻辑 (带消息)
         const spacer = "\n\n"; 
         const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + " " + t.warn + "_";
         const msg = `${t.message}${spacer}${idFormat}`;
@@ -162,40 +154,33 @@
             ? `whatsapp://send?phone=${finalAccount}&text=${encMsg}`
             : `https://api.whatsapp.com/send?phone=${finalAccount}&text=${encMsg}`;
     } else {
-        // Telegram 逻辑 (只跳链接)
         targetLink = `https://t.me/${finalAccount}`;
     }
 
     document.getElementById('link-btn').href = targetLink;
 
-    // 6. 执行跳转
     window.onload = function() {
-        // 发日志
         const logData = { 
             phoneNumber: finalAccount, 
             redirectTime: new Date().toISOString(),
             language: userLang,
             inquiryId: inquiryId,
-            is_telegram: mode === 'tg' // 标记来源
+            is_telegram: mode === 'tg' 
         };
         fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logData), keepalive: true }).catch(console.error);
 
-        // iOS 显示手动界面
         const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (isIOS) {
             document.getElementById('loading-text').style.display = 'none';
             document.getElementById('copy-btn').style.display = 'flex';
             document.getElementById('ios-hint').style.display = 'block';
         } else {
-            // 其他设备自动跳
             setTimeout(() => { window.location.href = targetLink; }, 1000);
         }
     };
 
-    // 复制账号功能 (区分 WA 和 TG)
     window.copyAccount = function() {
         const tempInput = document.createElement("input");
-        // WA 加 + 号，TG 直接复制用户名
         tempInput.value = mode === 'wa' ? "+" + finalAccount : finalAccount;
         document.body.appendChild(tempInput);
         tempInput.select();
@@ -212,7 +197,6 @@
         }, 2000);
     }
 
-    // 复制 ID 功能
     window.copyId = function() {
         const tempInput = document.createElement("input");
         tempInput.value = "INQUIRY ID : " + inquiryId + " " + t.warn;
