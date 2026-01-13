@@ -19,9 +19,10 @@
         body.mode-wa .icon-img { border-radius: 0; filter: drop-shadow(0 4px 8px rgba(37, 211, 102, 0.2)); }
 
         /* Telegram 主题 */
-        body.mode-tg .btn-primary { background-color: #2AABEE; } /* 官方蓝 */
+        body.mode-tg .btn-primary { background-color: #0088cc; } /* TG 官方蓝 */
         body.mode-tg .btn-copy { background-color: #555; }
-        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 8px rgba(42, 171, 238, 0.3)); }
+        /* 修复图标圆角，确保官方圆形图标不被切边 */
+        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 12px rgba(0, 136, 204, 0.3)); }
 
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
@@ -70,11 +71,11 @@
 
     const API_URL = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // WA 图标 (原有)
+    // WA 图标 (保持不变)
     const ICON_WA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+";
     
-    // 【修改】TG 图标 (官方高清蓝底白飞机)
-    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIj48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxMjAiIHI9IjEyMCIgZmlsbD0iIzJBQUJFRSIvPjxwYXRoIGZpbGw9IiNGRkYiIGQ9Ik01NCAxMThsMzIgMTIgMTEgMzYgMTAtMjcgNDgtNDMtNjAgNDgtMyAyNiA4NCAyNUwyMTMgNDZ6Ii8+PC9zdmc+";
+    // 【修改 1】TG 官方图标 (SVG Base64 蓝底白飞机)
+    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIj48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxMjAiIHI9IjEyMCIgZmlsbD0iIzI5QjZGNiIvPjxwYXRoIGZpbGw9IiNGRkYiIGQ9Ik01NCAxMThsMzIgMTIgMTEgMzYgMTAtMjcgNDgtNDMtNjAgNDgtMyAyNiA4NCAyNUwyMTMgNDZ6Ii8+PC9zdmc+";
 
     // 多语言文案
     const TEXT = {
@@ -83,7 +84,7 @@
             'ru': { btn: "Открыть WhatsApp", copy: "Скопировать номер", hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
         'tg': {
-            // 【修改】文案更新
+            // 【修改 2】文案保持 Copy Sales Account
             'en': { btn: "Open Telegram", copy: "Copy Sales Account", hint: "If Telegram fails to open:<br>1. Copy username (Gray Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
             'ru': { btn: "Открыть Telegram", copy: "Скопировать имя", hint: "Если не открывается:<br>1. Скопируйте имя выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
@@ -96,6 +97,8 @@
         }
     };
 
+    // --- 逻辑开始 ---
+    
     const urlParams = new URLSearchParams(window.location.search);
     const mode = urlParams.get('channel') === 'tg' ? 'tg' : 'wa'; 
     
@@ -157,14 +160,37 @@
     document.getElementById('link-btn').href = targetLink;
 
     window.onload = function() {
+        // --- 核心修改：流量来源智能识别 ---
+        const ua = navigator.userAgent;
+        let trafficSource = 'Direct/Unknown';
+        const rawRef = document.referrer.toLowerCase();
+
+        // 1. 优先匹配 APP 内置浏览器 UA
+        if (ua.includes("Instagram")) trafficSource = "Instagram App";
+        else if (ua.includes("FBAN") || ua.includes("FBAV")) trafficSource = "Facebook App";
+        else if (ua.includes("Messenger")) trafficSource = "Messenger App";
+        // 2. 其次匹配 Referrer 域名
+        else if (rawRef.includes("facebook.com")) trafficSource = "Facebook Web";
+        else if (rawRef.includes("instagram.com")) trafficSource = "Instagram Web";
+        else if (rawRef.includes("google.")) trafficSource = "Google Search";
+        else if (rawRef.includes("yandex.")) trafficSource = "Yandex Search";
+        else if (rawRef.includes("vk.com")) trafficSource = "VK";
+        else if (rawRef.length > 0) trafficSource = rawRef; // 其他来源直接记录
+
         const logData = { 
             phoneNumber: finalAccount, 
             redirectTime: new Date().toISOString(),
             language: userLang,
             inquiryId: inquiryId,
             is_telegram: mode === 'tg',
-            referrerUrl: document.referrer || 'Direct'
+            
+            // 【修改 3】发送具体的 Referrer URL
+            referrerUrl: document.referrer || 'Direct',
+            
+            // 【修改 4】将识别出的流量渠道写入 note 字段，方便 Supabase 查看
+            note: "Source: " + trafficSource
         };
+        
         fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logData), keepalive: true }).catch(console.error);
 
         const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
