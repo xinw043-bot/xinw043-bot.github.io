@@ -3,278 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Connect on WhatsApp</title>
+    <title>Connect</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f2f5;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; transition: background 0.3s; }
+        .container { background: white; padding: 45px 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 360px; width: 100%; text-align: center; box-sizing: border-box; }
         
-        .container {
-            background: white;
-            padding: 45px 30px;
-            border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            max-width: 360px;
-            width: 100%;
-            text-align: center;
-            box-sizing: border-box;
-        }
+        .icon-img { width: 72px; height: 72px; margin-bottom: 30px; border-radius: 18px; transition: all 0.3s; }
         
-        .icon-img {
-            width: 72px;
-            height: 72px;
-            margin-bottom: 30px;
-            filter: drop-shadow(0 4px 8px rgba(37, 211, 102, 0.2));
-            border-radius: 18px;
-        }
-        
-        h2 { display: none; }
-        
-        .btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            padding: 16px 0;
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 16px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            cursor: pointer;
-            border: none;
-            -webkit-tap-highlight-color: transparent;
-            transition: transform 0.1s, opacity 0.2s;
-            line-height: 1.2;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
+        .btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 16px 0; color: white; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 12px; margin-bottom: 12px; cursor: pointer; border: none; -webkit-tap-highlight-color: transparent; transition: all 0.2s; line-height: 1.2; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
 
-        .btn-primary { background-color: #25D366; }
-        .btn-copy { background-color: #0084ff; margin-bottom: 0; }
-        
+        /* WhatsApp 主题 */
+        body.mode-wa .btn-primary { background-color: #25D366; }
+        body.mode-wa .btn-copy { background-color: #0084ff; }
+        body.mode-wa .icon-img { filter: drop-shadow(0 4px 8px rgba(37, 211, 102, 0.2)); }
+
+        /* Telegram 主题 */
+        body.mode-tg .btn-primary { background-color: #0088cc; }
+        body.mode-tg .btn-copy { background-color: #555; } /* TG模式下复制按钮用深灰色区分 */
+        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 8px rgba(0, 136, 204, 0.2)); }
+
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
-        .ios-hint-text {
-            font-size: 13px; color: #d93025; background-color: #fff8f8;
-            padding: 12px; border-radius: 8px; margin-top: 20px;
-            line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb;
-        }
+        .ios-hint-text { font-size: 13px; color: #d93025; background-color: #fff8f8; padding: 12px; border-radius: 8px; margin-top: 20px; line-height: 1.4; text-align: left; display: none; border: 1px solid #ffebeb; }
 
-        .ref-id-box {
-            margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;
-            font-size: 12px; color: #999; font-family: sans-serif;
-            letter-spacing: 0.5px; font-style: italic;
-            cursor: pointer; position: relative;
-        }
-        .ref-id-box:active { background-color: #f5f5f5; border-radius: 4px; color: #666; }
-        
-        .ref-id-text { color: #666; font-weight: normal; user-select: all; }
+        .ref-id-box { margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee; font-size: 12px; color: #999; font-family: monospace; letter-spacing: 0.5px; font-style: italic; cursor: pointer; position: relative; }
+        .ref-id-text { color: #555; font-weight: bold; user-select: all; }
 
-        #id-copy-tip {
-            position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px;
-            border-radius: 4px; font-size: 10px; display: none;
-            font-family: sans-serif; font-style: normal; white-space: nowrap;
-        }
+        #toast-tip { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; display: none; white-space: nowrap; z-index: 99; }
     </style>
 </head>
-<body>
+<body class="mode-wa"> <!-- 默认 WA 模式 -->
 
     <div class="container">
-        <img class="icon-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+" alt="WhatsApp">
+        <!-- 图标 (由 JS 切换) -->
+        <img id="main-icon" class="icon-img" src="" alt="Icon">
 
-        <a id="wa-link" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
+        <!-- 按钮 A: 直接打开 -->
+        <a id="link-btn" href="#" target="_blank" class="btn btn-primary">Open WhatsApp</a>
         
-        <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyNumber()">
+        <!-- 按钮 B: 复制账号 -->
+        <button id="copy-btn" class="btn btn-copy" style="display:none;" onclick="copyAccount()">
             Copy Sales WhatsApp
         </button>
         
+        <!-- iOS 提示语 -->
         <div id="ios-hint" class="ios-hint-text"></div>
 
         <div id="loading-text" class="loading">Redirecting...</div>
 
+        <!-- 底部 ID -->
         <div class="ref-id-box" onclick="copyId()" title="Tap to copy">
-            <span id="id-copy-tip">Copied!</span>
+            <span id="toast-tip">Copied!</span>
             INQUIRY ID : <span id="ref-id-span" class="ref-id-text">...</span>
         </div>
     </div>
 
     <script>
-    const ruNumbers = ["8613831115956", "8615580779722"];
-    const esNumbers = ["8613890174417", "8619994654895", "8618923713151", "8618067136423"]; 
-    const arNumbers = ["8613890174417", "8619994654895", "8618923713151", "8618067136423"]; 
-    const defaultNumbers = ["8613890174417", "8619994654895", "8618923713151", "8618067136423"];
+    // --- 配置区 ---
+    const WA_NUMBERS = {
+        'ru': ["8613831115956", "8615580779722"],
+        'default': ["8613890174417", "8619994654895", "8618923713151", "8618067136423"]
+    };
     
-    const apiUrl = "https://xinw043-bot-github-io.vercel.app/api/log"; 
+    const TG_USERNAMES = ['Souffle0706', 'W1342547']; // TG 账号池
 
-    // --- 语言包升级：新增波兰语 + 更新招呼语 ---
-    const translations = {
-        // 默认 (英语)
-        'en': {
-            openBtn: "Open WhatsApp", copyBtn: "Copy Sales WhatsApp",
-            hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
-            hintFallback: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us.",
-            loading: "Redirecting...", copied: "Copied! ✅",
-            message: "Hi, I saw your ad . Can I get a catalog/price list?", // 已更新
-            msgWarning: "(Do not delete)"
+    const API_URL = "https://xinw043-bot-github-io.vercel.app/api/log"; 
+
+    // WA 图标 (SVG Base64)
+    const ICON_WA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+";
+    
+    // TG 图标 (SVG Base64)
+    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwODhjYyI+PHBhdGggZD0iTTEyIDBDNS4zNzMgMCAwIDUuMzczIDAgMTJzNS4zNzMgMTIgMTIgMTIgMTItNS4zNzMgMTItMTJTMTguNjI3IDAgMTIgMHptNS41NjIgOC4xNjFjLS4xOCAxLjg5Ny0uOTYyIDYuNTAyLTEuMzU5IDguNjI3LS4xNjguOS0uNSAxLjIwMS0uODIgMS4yMy0uNjk3LjA2NC0xLjIyNi0uNDYxLTEuOTAxLS45MDMtMS4wNTYtLjY5Mi0xLjY1My0xLjEyMy0yLjY3OC0xLjc5OS0xLjE4NS0uNzgxLS40MTctMS4yMS4yNTgtMS45MTEuMTc3LS4xODQgMy4yNDctMi45NzcgMy4zMDctMy4yMy4wMDctLjAzMi4wMTQtLjE1LS4wNTYtLjIxMnMtLjE3NC0uMDQxLS4yNDktLjAyNGMtLjEwNi4wMjQtMS43OTMgMS4xMzktNS4wNjIgMy4zNDUtLjQ3OS4zMjktLjkxMy40ODktMS4zMDIuNDgxLS40MjgtLjAwOS0xLjI1Mi0uMjQyLTEuODY1LS40NDItLjc1Mi0uMjQ0LTEuMzQ5LS4zNzQtMS4yOTctLjc4OS4wMjctLjIxNi4zMjUtLjQzNy44OTMtLjY2MyAzLjQ5OC0xLjUyNCA1LjgzMS0yLjUyOSA2Ljk5OC0zLjAxNCAzLjMzMi0xLjM4NiA0LjAyNS0xLjYyNyA0LjQ3Ni0xLjYzNS4wOTktLjAwMi4zMjEuMDIzLjQ2NS4xNDEuMTIxLjA5OS4xNTUuMjMyLjE3MS4zMjYuMDE2LjA5NC4wMzYuMzA4LjAyLjQ3NXoiIGZpbGw9IndoaXRlIi8+PC9zdmc+";
+
+    // 多语言文案 (支持两种模式)
+    const TEXT = {
+        'wa': {
+            'en': { btn: "Open WhatsApp", copy: "Copy Sales WhatsApp", hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
+            'ru': { btn: "Открыть WhatsApp", copy: "Скопировать номер", hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
-        // 俄语
-        'ru': {
-            openBtn: "Открыть WhatsApp", copyBtn: "Скопировать номер",
-            hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
-            hintFallback: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам.",
-            loading: "Перенаправление...", copied: "Скопировано! ✅",
-            message: "Здравствуйте, я видел вашу рекламу. Можно получить каталог/прайс-лист?", // 已更新
-            msgWarning: "(Не удалять)"
+        'tg': {
+            'en': { btn: "Open Telegram", copy: "Copy Telegram Username", hint: "If Telegram fails to open:<br>1. Copy username (Gray Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
+            'ru': { btn: "Открыть Telegram", copy: "Скопировать имя", hint: "Если не открывается:<br>1. Скопируйте имя выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
-        // 波兰语 (新增)
-        'pl': {
-            openBtn: "Otwórz WhatsApp", copyBtn: "Kopiuj numer sprzedaży",
-            hint: "Jeśli WhatsApp się nie otwiera:<br>1. Skopiuj numer (niebieski przycisk).<br>2. <b>Kliknij ID poniżej</b>, aby skopiować i wyślij do nas.",
-            hintFallback: "Jeśli WhatsApp się nie otwiera:<br>1. Skopiuj numer (niebieski przycisk).<br>2. <b>Kliknij ID poniżej</b>, aby skopiować i wyślij do nas.",
-            loading: "Przekierowanie...", copied: "Skopiowano! ✅",
-            message: "Cześć, widziałem Waszą reklamę. Czy mogę prosić o katalog/cennik?", // 专门适配
-            msgWarning: "(Nie usuwać)"
-        },
-        // 西班牙语
-        'es': {
-            openBtn: "Abrir WhatsApp", copyBtn: "Copiar WhatsApp",
-            hint: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
-            hintFallback: "Si no abre:<br>1. Copie el número (Botón Azul).<br>2. <b>Toque el ID abajo</b> para copiar y envíenoslo.",
-            loading: "Redirigiendo...", copied: "¡Copiado! ✅",
-            message: "Hola, vi su anuncio. ¿Podría enviarme un catálogo/lista de precios?", // 已更新
-            msgWarning: "(No borrar)"
-        },
-        // 阿拉伯语
-        'ar': {
-            openBtn: "فتح واتساب", copyBtn: "نسخ رقم واتساب",
-            hint: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
-            hintFallback: "إذا لم يفتح:<br>1. انسخ الرقم (الزر الأزرق).<br>2. <b>اضغط على المعرف أدناه لنسخه</b> وأرسله إلينا.",
-            loading: "جاري التوجيه...", copied: "تم النسخ! ✅",
-            message: "مرحبًا، رأيت إعلانكم. هل يمكنني الحصول على الكتالوج/قائمة الأسعار؟", // 已更新
-            msgWarning: "(لا تحذف)"
+        // 通用
+        'common': {
+            'en': { loading: "Redirecting...", copied: "Copied! ✅", msg: "Hi, I saw your ad. Can I get a catalog/price list?", warn: "(Do not delete)" },
+            'ru': { loading: "Перенаправление...", copied: "Скопировано! ✅", msg: "Здравствуйте, я видел вашу рекламу. Можно получить каталог/прайс-лист?", warn: "(Не удалять)" },
+            'es': { loading: "Redirigiendo...", copied: "¡Copiado! ✅", msg: "Hola, vi su anuncio...", warn: "(No borrar)" },
+            'ar': { loading: "جاري التوجيه...", copied: "تم النسخ! ✅", msg: "مرحبًا...", warn: "(لا تحذف)" }
         }
     };
 
+    // --- 逻辑开始 ---
+    
+    // 1. 获取 URL 参数 ?channel=tg
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('channel') === 'tg' ? 'tg' : 'wa'; // 默认为 wa
+    
+    // 切换主题类名
+    document.body.className = `mode-${mode}`;
+    
+    // 设置图标
+    document.getElementById('main-icon').src = mode === 'tg' ? ICON_TG : ICON_WA;
+
+    // 2. 基础函数
     function generateInquiryId() {
-        let id = localStorage.getItem('wa_inquiry_id');
+        let id = localStorage.getItem('wa_inquiry_id'); // 共用同一个 ID 存储
         if (!id) {
-            const timePart = Date.now().toString().slice(-4); 
-            const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-            id = `REF-${timePart}${randomPart}`;
+            const prefix = mode === 'tg' ? 'TG-REF-' : 'REF-'; // 其实可以统一，这里保持兼容
+            id = `REF-${Date.now().toString().slice(-4)}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
             localStorage.setItem('wa_inquiry_id', id);
         }
         return id;
     }
 
-    const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
-    let currentLang = 'en'; 
-    let currentPool = defaultNumbers;
+    const userLang = (navigator.language || 'en').substring(0, 2).toLowerCase();
+    const langKey = TEXT['common'][userLang] ? userLang : 'en'; // 语言回退
+    const t = TEXT['common'][langKey];
+    const t_mode = TEXT[mode][langKey] || TEXT[mode]['en'];
 
-    if (translations[userLang]) {
-        currentLang = userLang;
-        if (userLang === 'ru') currentPool = ruNumbers;
-        // 波兰语暂无专属销售，走默认英语池
-        else if (userLang === 'pl') currentPool = defaultNumbers; 
-        else if (userLang === 'es') currentPool = esNumbers;
-        else if (userLang === 'ar') currentPool = arNumbers;
-    }
-
-    const t = translations[currentLang];
-
-    if (currentLang === 'ar') {
+    if (userLang === 'ar') {
         document.body.setAttribute('dir', 'rtl');
         document.querySelector('.ios-hint-text').style.textAlign = 'right';
     }
 
-    let finalNumber = localStorage.getItem('assigned_wa');
-    if (!finalNumber || !currentPool.includes(finalNumber)) {
-        finalNumber = currentPool[Math.floor(Math.random() * currentPool.length)];
-        localStorage.setItem('assigned_wa', finalNumber);
+    // 3. 号码分配
+    let finalAccount = localStorage.getItem(`assigned_${mode}`);
+    if (!finalAccount) {
+        if (mode === 'wa') {
+            const pool = userLang === 'ru' ? WA_NUMBERS['ru'] : WA_NUMBERS['default'];
+            finalAccount = pool[Math.floor(Math.random() * pool.length)];
+        } else {
+            finalAccount = TG_USERNAMES[Math.floor(Math.random() * TG_USERNAMES.length)];
+        }
+        localStorage.setItem(`assigned_${mode}`, finalAccount);
     }
 
     const inquiryId = generateInquiryId();
     document.getElementById('ref-id-span').innerText = inquiryId;
 
-    document.getElementById('wa-link').innerText = t.openBtn;
-    document.getElementById('copy-btn').innerText = t.copyBtn;
-    document.getElementById('ios-hint').innerHTML = t.hint;
+    // 4. 更新界面文案
+    document.getElementById('link-btn').innerText = t_mode.btn;
+    document.getElementById('copy-btn').innerText = t_mode.copy;
+    document.getElementById('ios-hint').innerHTML = t_mode.hint;
     document.getElementById('loading-text').innerText = t.loading;
 
-    window.onload = function() {
-        const ua = navigator.userAgent;
-        let finalReferrer = document.referrer;
-        if (ua.includes("Instagram")) {
-            finalReferrer = "Instagram App";
-        } else if (ua.includes("FBAN") || ua.includes("FBAV") || ua.includes("Messenger")) {
-            if (ua.includes("Messenger")) finalReferrer = "Messenger App";
-            else finalReferrer = "Facebook App";
-        }
-        if (!finalReferrer) finalReferrer = "Direct/Unknown";
+    // 5. 生成链接
+    let targetLink;
+    if (mode === 'wa') {
+        // WhatsApp 逻辑 (带消息)
+        const spacer = "\n\n"; 
+        const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + " " + t.warn + "_";
+        const msg = `${t.message}${spacer}${idFormat}`;
+        const encMsg = encodeURIComponent(msg);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        targetLink = isAndroid 
+            ? `whatsapp://send?phone=${finalAccount}&text=${encMsg}`
+            : `https://api.whatsapp.com/send?phone=${finalAccount}&text=${encMsg}`;
+    } else {
+        // Telegram 逻辑 (只跳链接)
+        targetLink = `https://t.me/${finalAccount}`;
+    }
 
+    document.getElementById('link-btn').href = targetLink;
+
+    // 6. 执行跳转
+    window.onload = function() {
+        // 发日志
         const logData = { 
-            phoneNumber: finalNumber, 
+            phoneNumber: finalAccount, 
             redirectTime: new Date().toISOString(),
             language: userLang,
             inquiryId: inquiryId,
-            referrerUrl: finalReferrer 
+            is_telegram: mode === 'tg' // 标记来源
         };
-        fetch(apiUrl, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(logData), keepalive: true 
-        }).catch(console.error);
+        fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logData), keepalive: true }).catch(console.error);
 
-        const spacer = "\n\n"; 
-        const idFormat = "─────\n_" + "INQUIRY ID : " + inquiryId + " " + t.msgWarning + "_";
-        const finalMessageText = `${t.message}${spacer}${idFormat}`; 
-        const encodedMessage = encodeURIComponent(finalMessageText);
-        
-        const isAndroid = /Android/i.test(ua);
-        const isIOS = /iPhone|iPad|iPod/i.test(ua);
-        
-        const androidLink = `whatsapp://send?phone=${finalNumber}&text=${encodedMessage}`;
-        const iosLink = `https://api.whatsapp.com/send?phone=${finalNumber}&text=${encodedMessage}`; 
-        const targetLink = isAndroid ? androidLink : iosLink;
-
-        const linkBtn = document.getElementById('wa-link');
-        linkBtn.href = targetLink;
-
-        const loadingText = document.getElementById('loading-text');
-        const copyBtn = document.getElementById('copy-btn');
-        const iosHint = document.getElementById('ios-hint');
-
+        // iOS 显示手动界面
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (isIOS) {
-            loadingText.style.display = 'none';
-            copyBtn.style.display = 'flex';
-            iosHint.innerHTML = t.hint; 
-            iosHint.style.display = 'block';
+            document.getElementById('loading-text').style.display = 'none';
+            document.getElementById('copy-btn').style.display = 'flex';
+            document.getElementById('ios-hint').style.display = 'block';
         } else {
-            setTimeout(() => { 
-                window.location.href = targetLink; 
-            }, 1000);
-
-            setTimeout(() => {
-                loadingText.style.display = 'none';
-                copyBtn.style.display = 'flex'; 
-                iosHint.innerHTML = t.hintFallback; 
-                iosHint.style.display = 'block'; 
-            }, 2500);
+            // 其他设备自动跳
+            setTimeout(() => { window.location.href = targetLink; }, 1000);
         }
     };
 
-    function copyNumber() {
+    // 复制账号功能 (区分 WA 和 TG)
+    window.copyAccount = function() {
         const tempInput = document.createElement("input");
-        tempInput.value = "+" + finalNumber;
+        // WA 加 + 号，TG 直接复制用户名
+        tempInput.value = mode === 'wa' ? "+" + finalAccount : finalAccount;
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand("copy");
@@ -284,28 +206,25 @@
         const originalText = btn.innerText;
         btn.innerText = t.copied; 
         btn.style.backgroundColor = "#128C7E"; 
-        
         setTimeout(() => {
             btn.innerText = originalText;
-            btn.style.backgroundColor = "#0084ff";
+            btn.style.backgroundColor = mode === 'wa' ? "#0084ff" : "#555";
         }, 2000);
     }
 
-    function copyId() {
+    // 复制 ID 功能
+    window.copyId = function() {
         const tempInput = document.createElement("input");
-        tempInput.value = "INQUIRY ID : " + inquiryId + " " + t.msgWarning;
+        tempInput.value = "INQUIRY ID : " + inquiryId + " " + t.warn;
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand("copy");
         document.body.removeChild(tempInput);
-
-        const tip = document.getElementById('id-copy-tip');
+        
+        const tip = document.getElementById('toast-tip');
         tip.style.display = 'block';
-        setTimeout(() => {
-            tip.style.display = 'none';
-        }, 1500);
+        setTimeout(() => { tip.style.display = 'none'; }, 1500);
     }
     </script>
 </body>
 </html>
-
