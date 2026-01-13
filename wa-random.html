@@ -8,7 +8,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; transition: background 0.3s; }
         .container { background: white; padding: 45px 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 360px; width: 100%; text-align: center; box-sizing: border-box; }
         
-        .icon-img { width: 72px; height: 72px; margin-bottom: 30px; border-radius: 18px; transition: all 0.3s; }
+        .icon-img { width: 80px; height: 80px; margin-bottom: 30px; border-radius: 20px; transition: all 0.3s; }
         
         .btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 16px 0; color: white; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 12px; margin-bottom: 12px; cursor: pointer; border: none; -webkit-tap-highlight-color: transparent; transition: all 0.2s; line-height: 1.2; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
@@ -16,12 +16,12 @@
         /* WhatsApp 主题 */
         body.mode-wa .btn-primary { background-color: #25D366; }
         body.mode-wa .btn-copy { background-color: #0084ff; }
-        body.mode-wa .icon-img { filter: drop-shadow(0 4px 8px rgba(37, 211, 102, 0.2)); }
+        body.mode-wa .icon-img { border-radius: 0; filter: drop-shadow(0 4px 8px rgba(37, 211, 102, 0.2)); }
 
         /* Telegram 主题 */
-        body.mode-tg .btn-primary { background-color: #0088cc; }
-        body.mode-tg .btn-copy { background-color: #555; } /* 灰色按钮保持不变 */
-        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 8px rgba(0, 136, 204, 0.3)); }
+        body.mode-tg .btn-primary { background-color: #2AABEE; } /* 官方蓝 */
+        body.mode-tg .btn-copy { background-color: #555; }
+        body.mode-tg .icon-img { border-radius: 50%; filter: drop-shadow(0 4px 8px rgba(42, 171, 238, 0.3)); }
 
         .loading { font-size: 14px; color: #888; margin-top: 10px; }
         
@@ -33,10 +33,10 @@
         #toast-tip { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; display: none; white-space: nowrap; z-index: 99; }
     </style>
 </head>
-<body class="mode-wa"> <!-- 默认 WA 模式 -->
+<body class="mode-wa"> 
 
     <div class="container">
-        <!-- 图标 (由 JS 切换) -->
+        <!-- 图标 -->
         <img id="main-icon" class="icon-img" src="" alt="Icon">
 
         <!-- 按钮 A: 直接打开 -->
@@ -66,24 +66,24 @@
         'default': ["8613890174417", "8619994654895", "8618923713151", "8618067136423"]
     };
     
-    const TG_USERNAMES = ['Souffle0706', 'W1342547']; // TG 账号池
+    const TG_USERNAMES = ['Souffle0706', 'W1342547'];
 
     const API_URL = "https://xinw043-bot-github-io.vercel.app/api/log"; 
 
-    // WA 图标 (保持原版)
+    // WA 图标 (原有)
     const ICON_WA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgZmlsbD0ibm9uZSI+PHBhdGggZD0iTTE2LjYgMEM3LjQgMCAwIDcuNSAwIDE2LjdjMCAzIC44IDUuOSAyLjMgOC40TC42IDMzbDguMS0yLjFjMi40IDEuNCA1LjEgMi4xIDggMi4xIDkuMSAwIDE2LjUtNy41IDE2LjUtMTYuN1MyNS43IDAgMTYuNiAwem0wIDI3LjhjLTIuNiAwLTUuMS0uNy03LjMtMmwtLjUtLjMtNS40IDEuNCAxLjQtNS4zLS4zLS41QzMuMSAxOC44IDIuNCAxNi4zIDIuNCAxMy44YzAtNy44IDYuNC0xNC4yIDE0LjItMTQuMiAzLjggMCA3LjQgMS41IDEwIDQuMiAyLjcgMi43IDQuMiA2LjMgNC4yIDEwIDAgNy45LTYuMyAxNC4yLTE0LjIgMTR6bTcuOC0xMC40Yy0uNC0uMi0yLjUtMS4yLTIuOS0xLjQtLjQtLjItLjYtLjMtLjkuMS0uMy40LTEuMSAxLjQtMS4zIDEuNy0uMi4zLS41LS4xLS45LjEtMS44LS45LTMtMS42LTQuMi0zLjctLjYtMS4xLjYtMSAuMS0yLS4xLS4yLS4yLS40LS4zLS42LS4xLS4yLS4xLS40IDAtLjYuMS0uMi40LS45LjYtMS4zLjEtLjIgMC0uNC0uMS0uNS0uMS0uMi0uOS0yLjItMS4zLTMtLjQtLjgtLjctLjctMS0uN2gtLjhjLS4zIDAtLjcuMS0xLjEuNS0uNC40LTEuNSAxLjUtMS41IDMuNiAwIDIuMiAxLjYgNC4zIDEuOCA0LjYuMi4zIDMuMSA0LjcgNy42IDYuNiAyLjcgMS4xIDMuOCAxLjEgNS4yLjkgMS42LS4yIDMuNS0xLjQgNC0yLjguNS0xLjMuNS0yLjUuMy0yLjctLjEtLjItLjQtLjMtLjgtLjV6IiBmaWxsPSIjMjVkMzY2Ii8+PC9zdmc+";
     
-    // 【修改点 1】TG 图标 (替换为官方蓝底白飞机的 SVG Base64)
-    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIj48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxMjAiIHI9IjEyMCIgZmlsbD0iIzI0QTFERSIvPjxwYXRoIGZpbGw9IiNGRkYiIGQ9Ik01NCAxMThsMzIgMTIgMTEgMzYgMTAtMjcgNDgtNDMtNjAgNDgtMyAyNiA4NCAyNUwyMTMgNDZ6Ii8+PC9zdmc+";
+    // 【修改】TG 图标 (官方高清蓝底白飞机)
+    const ICON_TG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIj48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxMjAiIHI9IjEyMCIgZmlsbD0iIzJBQUJFRSIvPjxwYXRoIGZpbGw9IiNGRkYiIGQ9Ik01NCAxMThsMzIgMTIgMTEgMzYgMTAtMjcgNDgtNDMtNjAgNDgtMyAyNiA4NCAyNUwyMTMgNDZ6Ii8+PC9zdmc+";
 
-    // 多语言文案 (支持两种模式)
+    // 多语言文案
     const TEXT = {
         'wa': {
             'en': { btn: "Open WhatsApp", copy: "Copy Sales WhatsApp", hint: "If WhatsApp fails to open:<br>1. Copy sales number (Blue Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
             'ru': { btn: "Открыть WhatsApp", copy: "Скопировать номер", hint: "Если не открывается:<br>1. Скопируйте номер выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
         'tg': {
-            // 【修改点 2】文案更新为 Copy Sales Account
+            // 【修改】文案更新
             'en': { btn: "Open Telegram", copy: "Copy Sales Account", hint: "If Telegram fails to open:<br>1. Copy username (Gray Button).<br>2. <b>Tap the ID below to copy</b> & send to us." },
             'ru': { btn: "Открыть Telegram", copy: "Скопировать имя", hint: "Если не открывается:<br>1. Скопируйте имя выше.<br>2. <b>Нажмите на ID ниже</b>, скопируйте и пришлите нам." }
         },
@@ -96,8 +96,6 @@
         }
     };
 
-    // --- 逻辑开始 ---
-    
     const urlParams = new URLSearchParams(window.location.search);
     const mode = urlParams.get('channel') === 'tg' ? 'tg' : 'wa'; 
     
@@ -107,7 +105,6 @@
     function generateInquiryId() {
         let id = localStorage.getItem('wa_inquiry_id'); 
         if (!id) {
-            const prefix = mode === 'tg' ? 'TG-REF-' : 'REF-'; 
             id = `REF-${Date.now().toString().slice(-4)}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
             localStorage.setItem('wa_inquiry_id', id);
         }
@@ -165,7 +162,8 @@
             redirectTime: new Date().toISOString(),
             language: userLang,
             inquiryId: inquiryId,
-            is_telegram: mode === 'tg' 
+            is_telegram: mode === 'tg',
+            referrerUrl: document.referrer || 'Direct'
         };
         fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logData), keepalive: true }).catch(console.error);
 
