@@ -52,7 +52,7 @@ app.get('/api/check-phone', async (req, res) => {
     } catch (error) { res.json({ found: false }); }
 });
 
-// --- 写入接口 (优化字段匹配) ---
+// --- 写入接口 (优化字段匹配，新增 fbc 与 fbp) ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
@@ -65,7 +65,7 @@ app.post('/api/log', async (req, res) => {
         else if (logData.is_website === true) tableName = 'website_logs';
 
         // 爬虫拦截
-        const botKeywords = ['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'python'];
+        const botKeywords =['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'python'];
         if (botKeywords.some(keyword => uaLower.includes(keyword))) {
             return res.status(200).send({ success: true, skipped: true });
         }
@@ -78,20 +78,23 @@ app.post('/api/log', async (req, res) => {
 
         if (!supabase) return res.status(200).send({ success: false });
 
-        // 执行写入：对齐截图中的数据库字段
+        // 执行写入：对齐截图中的数据库字段及新增追踪参数
         const { error } = await supabase
             .from(tableName)
             .insert({
                 phone_number: logData.phoneNumber, // 对齐前端驼峰
                 redirect_time: bjTime,
-                ip: visitorIP,
+                ip: visitorIP, // 使用后端原生抓取的真实IP
                 country: country,
                 city: city,
-                user_agent: ua,
+                user_agent: ua, // 使用后端原生抓取的UA
                 language: logData.language || 'en',
-                inquiry_id: logData.inquiryId || 'N/A', // 对齐前端驼峰
+                inquiry_id: logData.inquiryId || 'N/A',
                 referrer_url: logData.referrerUrl || 'Direct',
-                note: logData.note || ''
+                note: logData.note || '',
+                // 👇 ✨ 核心新增：接收 Shopify 传过来的 Meta 追踪环境数据
+                fbc: logData.fbc || null,
+                fbp: logData.fbp || null
             });
 
         if (error) throw error;
