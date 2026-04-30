@@ -52,7 +52,7 @@ app.get('/api/check-phone', async (req, res) => {
     } catch (error) { res.json({ found: false }); }
 });
 
-// --- 写入接口 (优化字段匹配，新增 fbc 与 fbp) ---
+// --- 写入接口 (已补充 Google/Meta 参数同步逻辑) ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
@@ -73,28 +73,39 @@ app.post('/api/log', async (req, res) => {
         const country = req.headers['x-vercel-ip-country'] || 'Unknown';
         let city = req.headers['x-vercel-ip-city'] || 'Unknown';
         try { city = decodeURIComponent(city); } catch (e) {}
+        
+        // 后端直接抓取最真实 IP，防前端伪造
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         const bjTime = getBeijingTime();
 
         if (!supabase) return res.status(200).send({ success: false });
 
-        // 执行写入：对齐截图中的数据库字段及新增追踪参数
+        // 执行写入：包含 Meta 及 Google 的 6 个新字段
         const { error } = await supabase
             .from(tableName)
             .insert({
-                phone_number: logData.phoneNumber, // 对齐前端驼峰
+                phone_number: logData.phoneNumber, 
                 redirect_time: bjTime,
-                ip: visitorIP, // 使用后端原生抓取的真实IP
+                ip: visitorIP, 
                 country: country,
                 city: city,
-                user_agent: ua, // 使用后端原生抓取的UA
+                user_agent: ua, 
                 language: logData.language || 'en',
                 inquiry_id: logData.inquiryId || 'N/A',
-                referrer_url: logData.referrerUrl || 'Direct',
                 note: logData.note || '',
-                // 👇 ✨ 核心新增：接收 Shopify 传过来的 Meta 追踪环境数据
+                
+                // 修复：确保和前端传来的 snake_case 命名对齐
+                referrer_url: logData.referrer_url || 'Direct', 
+                
+                // 接收 Meta 参数
                 fbc: logData.fbc || null,
-                fbp: logData.fbp || null
+                fbp: logData.fbp || null,
+                
+                // ✨ 新增：接收 Google 追踪参数
+                gclid: logData.gclid || null,
+                wbraid: logData.wbraid || null,
+                gbraid: logData.gbraid || null,
+                gcl_au: logData.gcl_au || null
             });
 
         if (error) throw error;
