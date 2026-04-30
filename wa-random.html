@@ -3,59 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connecting to Sales Manager...</title>
+    <title>Connecting to Manager...</title>
     <style>
-        body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f5f7; color: #333; text-align: center; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f5f7; color: #333; text-align: center; padding: 20px; box-sizing: border-box; }
+        .loader { border: 4px solid #e0e0e0; border-top: 4px solid #25D366; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .btn { display: none; margin-top: 20px; padding: 12px 24px; border-radius: 25px; color: white; text-decoration: none; font-weight: bold; font-size: 16px; }
+        .btn { display: none; margin-top: 25px; padding: 14px 30px; border-radius: 25px; color: white; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; }
+        .btn:active { opacity: 0.8; }
         .btn.wa { background-color: #25D366; }
         .btn.tg { background-color: #0088cc; }
+        #debugInfo { margin-top: 30px; font-size: 12px; color: #999; word-break: break-all; background: #eee; padding: 10px; border-radius: 8px; display: none; }
     </style>
 </head>
 <body>
 
     <div class="loader" id="loader"></div>
-    <h2 id="statusText">Connecting you to your manager...</h2>
-    <p style="font-size: 14px; color: #666; padding: 0 20px;">If the app does not open automatically, please click the button below.</p>
+    <h2 id="statusText" style="margin-bottom: 10px;">Connecting to App...</h2>
+    <p style="font-size: 14px; color: #666; max-width: 80%;">If the app does not open automatically, please click the button below.</p>
     
     <a href="#" id="manualBtn" class="btn">Open App</a>
+    
+    <!-- 诊断信息展示区 (只有报错时才会出现) -->
+    <div id="debugInfo"></div>
 
     <script>
-        // 1. 获取网址中的参数
-        const urlParams = new URLSearchParams(window.location.search);
-        const channel = urlParams.get('channel');
-        const phone = urlParams.get('phone');
-        const account = urlParams.get('account');
+        // 1. 增强版参数解析：同时兼容 ? 和 # 后面的参数，防 Meta 浏览器截断
+        function getQueryParams() {
+            var params = {};
+            var qs = window.location.search.substring(1) || window.location.hash.substring(1);
+            var vars = qs.split('&');
+            for (var i = 0; i < vars.length; i++) {
+                var pair = vars[i].split('=');
+                if (pair[0]) {
+                    params[pair[0].toLowerCase()] = decodeURIComponent(pair[1] || '');
+                }
+            }
+            return params;
+        }
+
+        const params = getQueryParams();
+        const channel = params.channel;
+        const phone = params.phone;
+        const account = params.account;
 
         let targetUrl = "";
+        let schemeUrl = ""; // 底层强制唤起协议
         const btn = document.getElementById('manualBtn');
 
-        // 2. 根据参数组合最终的唤起链接
+        // 2. 匹配逻辑与链接生成
         if (channel === 'wa' && phone) {
             targetUrl = "https://wa.me/" + phone;
+            // whatsapp:// 是强制脱离 FB/IG 浏览器的“越狱”协议
+            schemeUrl = "whatsapp://send?phone=" + phone; 
             btn.classList.add('wa');
-            btn.classList.add('show');
             btn.innerText = "Open WhatsApp";
             btn.style.display = "inline-block";
         } else if (channel === 'tg' && account) {
             targetUrl = "https://t.me/" + account;
+            // tg:// 是强制唤起 Telegram 的协议
+            schemeUrl = "tg://resolve?domain=" + account; 
             btn.classList.add('tg');
-            btn.classList.add('show');
             btn.innerText = "Open Telegram";
             btn.style.display = "inline-block";
         } else {
+            // 如果解析不到参数，抛出异常并将实际接收到的 URL 打印在屏幕上，方便我们排查
             document.getElementById('statusText').innerText = "Error: Invalid Link parameters.";
             document.getElementById('loader').style.display = "none";
+            const dbg = document.getElementById('debugInfo');
+            dbg.style.display = "block";
+            dbg.innerText = "Debug URL: \n" + window.location.href;
         }
 
-        // 3. 自动跳转与兜底手动按钮
+        // 3. 自动跳转执行逻辑
         if (targetUrl !== "") {
+            // 按钮默认绑定官方通用链接，作为最稳妥的兜底
             btn.href = targetUrl;
-            // 延迟 800ms 自动跳转，给系统一点反应时间
+            
             setTimeout(() => {
-                window.location.href = targetUrl;
-            }, 800);
+                // 第一波攻击：使用底层协议强制尝试切出当前浏览器唤起 App
+                window.location.href = schemeUrl;
+                
+                // 第二波兜底：如果 600ms 后页面还没被切走 (可能客户没装APP)，再使用通用 https 链接
+                setTimeout(() => {
+                    window.location.href = targetUrl;
+                }, 600);
+            }, 300);
         }
     </script>
 </body>
