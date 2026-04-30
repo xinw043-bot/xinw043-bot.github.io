@@ -6,88 +6,154 @@
     <title>Connecting to Manager...</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f5f7; color: #333; text-align: center; padding: 20px; box-sizing: border-box; }
-        .loader { border: 4px solid #e0e0e0; border-top: 4px solid #25D366; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .card { background: #fff; padding: 35px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 340px; }
+        
+        .loader { border: 4px solid #e0e0e0; border-top: 4px solid #25D366; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin: 0 auto 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .btn { display: none; margin-top: 25px; padding: 14px 30px; border-radius: 25px; color: white; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; }
+        
+        .title { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #111; }
+        .desc { font-size: 14px; color: #666; margin-bottom: 25px; line-height: 1.5; }
+        
+        .btn { display: none; align-items: center; justify-content: center; width: 100%; margin-bottom: 15px; padding: 15px 0; border-radius: 12px; color: white; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; border: none; cursor: pointer; }
         .btn:active { opacity: 0.8; }
         .btn.wa { background-color: #25D366; }
         .btn.tg { background-color: #0088cc; }
-        #debugInfo { margin-top: 30px; font-size: 12px; color: #999; word-break: break-all; background: #eee; padding: 10px; border-radius: 8px; display: none; }
+        
+        /* 复制号码模块 - 专门对付 iOS 拦截 */
+        .copy-box { display: none; align-items: center; justify-content: space-between; background: #f0f2f5; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed #ddd; }
+        .copy-text { font-size: 16px; font-weight: 700; color: #333; letter-spacing: 0.5px; }
+        .copy-btn { background: #333; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        .copy-btn:active { transform: scale(0.95); }
+        
+        .toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; display: none; z-index: 9999; animation: fadeup 0.3s ease; }
+        @keyframes fadeup { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
     </style>
 </head>
 <body>
-
-    <div class="loader" id="loader"></div>
-    <h2 id="statusText" style="margin-bottom: 10px;">Connecting to App...</h2>
-    <p style="font-size: 14px; color: #666; max-width: 80%;">If the app does not open automatically, please click the button below.</p>
+    <div class="card">
+        <div class="loader" id="loader"></div>
+        <div class="title" id="statusText">Connecting...</div>
+        <div class="desc" id="descText">Please wait while we open the App.</div>
+        
+        <!-- 兜底：复制号码区域 -->
+        <div class="copy-box" id="copyBox">
+            <span class="copy-text" id="accountText"></span>
+            <button class="copy-btn" onclick="copyAccount()">Copy</button>
+        </div>
+        
+        <!-- 兜底：手动唤起按钮 -->
+        <a href="#" id="manualBtn" class="btn">Open App</a>
+    </div>
     
-    <a href="#" id="manualBtn" class="btn">Open App</a>
-    
-    <!-- 诊断信息展示区 (只有报错时才会出现) -->
-    <div id="debugInfo"></div>
+    <div class="toast" id="toast">Copied successfully!</div>
 
     <script>
-        // 1. 增强版参数解析：同时兼容 ? 和 # 后面的参数，防 Meta 浏览器截断
+        // 1. 内置账号池 (当外部没有传参数时，自身执行随机分配)
+        const waPool =['8613890174417', '8619994654895', '8618923713151', '8618067136423', '8613831115956', '8615580779722', '8613723453442'];
+        const tgPool =['Souffle0706', 'W1342547'];
+
+        // 2. 防吞噬的参数解析
         function getQueryParams() {
             var params = {};
             var qs = window.location.search.substring(1) || window.location.hash.substring(1);
             var vars = qs.split('&');
             for (var i = 0; i < vars.length; i++) {
                 var pair = vars[i].split('=');
-                if (pair[0]) {
-                    params[pair[0].toLowerCase()] = decodeURIComponent(pair[1] || '');
-                }
+                if (pair[0]) params[pair[0].toLowerCase()] = decodeURIComponent(pair[1] || '');
             }
             return params;
         }
 
         const params = getQueryParams();
-        const channel = params.channel;
-        const phone = params.phone;
-        const account = params.account;
+        let channel = params.channel || 'wa'; // 默认频道为 wa
+        let phone = params.phone || '';
+        let account = params.account || '';
 
-        let targetUrl = "";
-        let schemeUrl = ""; // 底层强制唤起协议
-        const btn = document.getElementById('manualBtn');
-
-        // 2. 匹配逻辑与链接生成
-        if (channel === 'wa' && phone) {
-            targetUrl = "https://wa.me/" + phone;
-            // whatsapp:// 是强制脱离 FB/IG 浏览器的“越狱”协议
-            schemeUrl = "whatsapp://send?phone=" + phone; 
-            btn.classList.add('wa');
-            btn.innerText = "Open WhatsApp";
-            btn.style.display = "inline-block";
-        } else if (channel === 'tg' && account) {
-            targetUrl = "https://t.me/" + account;
-            // tg:// 是强制唤起 Telegram 的协议
-            schemeUrl = "tg://resolve?domain=" + account; 
-            btn.classList.add('tg');
-            btn.innerText = "Open Telegram";
-            btn.style.display = "inline-block";
-        } else {
-            // 如果解析不到参数，抛出异常并将实际接收到的 URL 打印在屏幕上，方便我们排查
-            document.getElementById('statusText').innerText = "Error: Invalid Link parameters.";
-            document.getElementById('loader').style.display = "none";
-            const dbg = document.getElementById('debugInfo');
-            dbg.style.display = "block";
-            dbg.innerText = "Debug URL: \n" + window.location.href;
+        // 3. ✨ 核心逻辑：如果直接打开网址没带参数，触发自身随机分配
+        if (channel === 'wa' && !phone) {
+            phone = waPool[Math.floor(Math.random() * waPool.length)];
+        } else if (channel === 'tg' && !account) {
+            account = tgPool[Math.floor(Math.random() * tgPool.length)];
         }
 
-        // 3. 自动跳转执行逻辑
+        let targetUrl = "";
+        let schemeUrl = ""; 
+        let displayText = "";
+
+        const btn = document.getElementById('manualBtn');
+        const copyBox = document.getElementById('copyBox');
+        const accountText = document.getElementById('accountText');
+
+        // 4. UI 与跳转链接构建
+        if (channel === 'wa' && phone) {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            targetUrl = "https://wa.me/" + cleanPhone;
+            schemeUrl = "whatsapp://send?phone=" + cleanPhone; // 底层防拦截协议
+            displayText = "+" + cleanPhone;
+
+            btn.classList.add('wa');
+            btn.innerText = "Open WhatsApp";
+            btn.style.display = "flex";
+            document.getElementById('loader').style.borderTopColor = "#25D366";
+
+        } else if (channel === 'tg' && account) {
+            targetUrl = "https://t.me/" + account;
+            schemeUrl = "tg://resolve?domain=" + account; // 底层防拦截协议
+            displayText = "@" + account;
+
+            btn.classList.add('tg');
+            btn.innerText = "Open Telegram";
+            btn.style.display = "flex";
+            document.getElementById('loader').style.borderTopColor = "#0088cc";
+        }
+
+        // 5. 渲染防拦截兜底 UI (复制号码框)
+        if (displayText) {
+            accountText.innerText = displayText;
+            copyBox.style.display = "flex";
+        }
+
+        // 6. 一键复制功能
+        window.copyAccount = function() {
+            // 复制时去掉前端的 + 或 @ 符号，方便客户直接粘贴到通讯录搜索
+            const textToCopy = accountText.innerText.replace('+', '').replace('@', '');
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const toast = document.getElementById('toast');
+                toast.style.display = "block";
+                setTimeout(() => { toast.style.display = "none"; }, 2000);
+            } catch (err) {
+                alert("Failed to copy. Please copy manually.");
+            }
+            document.body.removeChild(textArea);
+        };
+
+        // 7. 智能执行跳转
         if (targetUrl !== "") {
-            // 按钮默认绑定官方通用链接，作为最稳妥的兜底
             btn.href = targetUrl;
             
+            // 延迟 400ms 等待 UI 渲染完毕再跳
             setTimeout(() => {
-                // 第一波攻击：使用底层协议强制尝试切出当前浏览器唤起 App
+                // 第一波：直接用底层协议冲击，若装了 App 必能唤起
                 window.location.href = schemeUrl;
                 
-                // 第二波兜底：如果 600ms 后页面还没被切走 (可能客户没装APP)，再使用通用 https 链接
+                // 第二波：若 800ms 后页面没被切走(证明被拦截)，尝试通用链接
                 setTimeout(() => {
                     window.location.href = targetUrl;
-                }, 600);
-            }, 300);
+                    
+                    // 第三波：如果还是被拦截，通知用户手动操作
+                    setTimeout(() => {
+                        document.getElementById('loader').style.display = "none";
+                        document.getElementById('statusText').innerText = "Action Required";
+                        document.getElementById('statusText').style.color = "#d93025";
+                        document.getElementById('descText').innerHTML = "Auto-redirect blocked by your browser.<br>Please click the button or copy the number to add manually.";
+                    }, 800);
+                }, 800);
+            }, 400);
         }
     </script>
 </body>
