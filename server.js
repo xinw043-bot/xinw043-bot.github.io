@@ -52,7 +52,7 @@ app.get('/api/check-phone', async (req, res) => {
     } catch (error) { res.json({ found: false }); }
 });
 
-// --- 写入接口 (已补充 Google/Meta 参数同步逻辑) ---
+// --- 写入接口 (已补充精准查重与 Note 重写逻辑) ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
@@ -80,7 +80,57 @@ app.post('/api/log', async (req, res) => {
 
         if (!supabase) return res.status(200).send({ success: false });
 
-        // 执行写入：包含 Meta 及 Google 的 6 个新字段
+        // ==========================================
+        // ✨ 1. 后端精准查重：利用 IP 和 Cookie (fbp) 
+        // ==========================================
+        let visitCount = 1; // 默认为 1
+        let queryConditions =[];
+        
+        // 构建 OR 查询条件：IP 相同，或者 fbp(Cookie) 相同，都算作同一个人
+        if (visitorIP) queryConditions.push(`ip.eq.${visitorIP}`);
+        if (logData.fbp) queryConditions.push(`fbp.eq.${logData.fbp}`);
+
+        if (queryConditions.length > 0) {
+            const orQuery = queryConditions.join(',');
+            // 去数据库中检索这个人的历史记录数量
+            const { data: pastLogs, error: searchError } = await supabase
+                .from(tableName)
+                .select('id')
+                .or(orQuery);
+            
+            if (!searchError && pastLogs && pastLogs.length > 0) {
+                visitCount = pastLogs.length + 1; // 查到了历史记录，加上当前的这一次
+            }
+        }
+
+        // ==========================================
+        // ✨ 2. 重写 Note 字段格式 (剥离出带长参数的 URL)
+        // ==========================================
+        let actionPrefix = 'Chat';
+        let pageUrl = logData.referrer_url || '';
+
+        // 前端传来的格式通常是: "Chat | New User | https://cethermal.com/?utm_source..."
+        if (logData.note) {
+            const parts = logData.note.split(' | ');
+            if (parts.length >= 3) {
+                actionPrefix = parts[0]; // 提取动作 (Chat 或 Form)
+                pageUrl = parts.slice(2).join(' | '); // 提取最后面的完整长链接(即使链接里包含 | 也能正确合并)
+            } else {
+                pageUrl = logData.note; // 如果格式异常，作为兜底
+            }
+        }
+
+        // 根据后端查重结果生成绝对精准的状态
+        const trueStatus = visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User';
+        
+        // 组装成您要求的最终格式: 
+        // Chat | Old User (Click #2) | https://cethermal.com/?utm_source=fb...
+        const finalNote = `${actionPrefix} | ${trueStatus} | ${pageUrl}`;
+
+
+        // ==========================================
+        // ✨ 3. 执行最终写入
+        // ==========================================
         const { error } = await supabase
             .from(tableName)
             .insert({
@@ -92,16 +142,10 @@ app.post('/api/log', async (req, res) => {
                 user_agent: ua, 
                 language: logData.language || 'en',
                 inquiry_id: logData.inquiryId || 'N/A',
-                note: logData.note || '',
-                
-                // 修复：确保和前端传来的 snake_case 命名对齐
+                note: finalNote,  // <--- 写入重写后的精准 Note !!!
                 referrer_url: logData.referrer_url || 'Direct', 
-                
-                // 接收 Meta 参数
                 fbc: logData.fbc || null,
                 fbp: logData.fbp || null,
-                
-                // ✨ 新增：接收 Google 追踪参数
                 gclid: logData.gclid || null,
                 wbraid: logData.wbraid || null,
                 gbraid: logData.gbraid || null,
