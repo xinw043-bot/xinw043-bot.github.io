@@ -1,159 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connecting to Manager...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Connecting Chat...</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f5f7; color: #333; text-align: center; padding: 20px; box-sizing: border-box; }
-        .card { background: #fff; padding: 35px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 340px; }
-        
-        .loader { border: 4px solid #e0e0e0; border-top: 4px solid #25D366; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin: 0 auto 20px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .title { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #111; }
-        .desc { font-size: 14px; color: #666; margin-bottom: 25px; line-height: 1.5; }
-        
-        .btn { display: none; align-items: center; justify-content: center; width: 100%; margin-bottom: 15px; padding: 15px 0; border-radius: 12px; color: white; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; border: none; cursor: pointer; }
-        .btn:active { opacity: 0.8; }
-        .btn.wa { background-color: #25D366; }
-        .btn.tg { background-color: #0088cc; }
-        
-        /* 复制号码模块 - 专门对付 iOS 拦截 */
-        .copy-box { display: none; align-items: center; justify-content: space-between; background: #f0f2f5; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed #ddd; }
-        .copy-text { font-size: 16px; font-weight: 700; color: #333; letter-spacing: 0.5px; }
-        .copy-btn { background: #333; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
-        .copy-btn:active { transform: scale(0.95); }
-        
-        .toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; display: none; z-index: 9999; animation: fadeup 0.3s ease; }
-        @keyframes fadeup { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;}
+        .card { background: #fff; padding: 30px 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 380px; text-align: center; }
+        h2 { margin-top: 0; color: #333; font-size: 22px; }
+        .warning-box { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; margin-bottom: 20px; text-align: left; }
+        .number-box { background: #f0f2f5; padding: 15px; border-radius: 8px; font-size: 20px; font-weight: bold; letter-spacing: 0.5px; margin: 0 0 20px 0; color: #128C7E; word-break: break-all; }
+        .btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 14px; border-radius: 25px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 12px; text-decoration: none; transition: 0.2s; box-sizing: border-box; }
+        .btn-copy { background: #128C7E; color: #fff; box-shadow: 0 4px 15px rgba(18, 140, 126, 0.3); }
+        .btn-copy:active { transform: scale(0.98); }
+        .btn-outline { background: transparent; border: 2px solid #128C7E; color: #128C7E; }
+        #tg-styles.is-tg .number-box { color: #0088cc; }
+        #tg-styles.is-tg .btn-copy { background: #0088cc; box-shadow: 0 4px 15px rgba(0, 136, 204, 0.3); }
+        #tg-styles.is-tg .btn-outline { border-color: #0088cc; color: #0088cc; }
     </style>
 </head>
-<body>
+<body id="tg-styles">
     <div class="card">
-        <div class="loader" id="loader"></div>
-        <div class="title" id="statusText">Connecting...</div>
-        <div class="desc" id="descText">Please wait while we open the App.</div>
+        <h2 id="platformTitle">WhatsApp</h2>
         
-        <!-- 兜底：复制号码区域 -->
-        <div class="copy-box" id="copyBox">
-            <span class="copy-text" id="accountText"></span>
-            <button class="copy-btn" onclick="copyAccount()">Copy</button>
+        <div class="warning-box">
+            <b>安全提示：</b><br>
+            检测到您在微信/Messenger内浏览，平台可能拦截了自动跳转。<br>
+            👉 <b>请点击右上角 [在浏览器中打开 / Open in Safari]</b><br>
+            👉 或者直接复制下方业务员账号进行洽谈：
         </div>
-        
-        <!-- 兜底：手动唤起按钮 -->
-        <a href="#" id="manualBtn" class="btn">Open App</a>
+
+        <!-- 这里展示我们在第一步锁定好的，百分之百一致的账号 -->
+        <div class="number-box" id="displayNumber">Loading...</div>
+
+        <button class="btn btn-copy" onclick="copyAccount()">复制账号 (Copy Account)</button>
+        <a href="#" class="btn btn-outline" id="manualBtn">尝试手动唤起 (Try Open)</a>
     </div>
-    
-    <div class="toast" id="toast">Copied successfully!</div>
 
     <script>
-        // 1. 内置账号池 (当外部没有传参数时，自身执行随机分配)
-        const waPool =['8613890174417', '8619994654895', '8618923713151', '8618067136423', '8613831115956', '8615580779722', '8613723453442'];
-        const tgPool =['Souffle0706', 'W1342547'];
+        // 获取从 Shopify 传过来的参数
+        const params = new URLSearchParams(window.location.search);
+        const channel = params.get('channel');
+        const phone = params.get('phone'); // 纯数字
+        const display = params.get('display'); // 带空格和+号的展示格式
+        const account = params.get('account'); // Telegram 账号
 
-        // 2. 防吞噬的参数解析
-        function getQueryParams() {
-            var params = {};
-            var qs = window.location.search.substring(1) || window.location.hash.substring(1);
-            var vars = qs.split('&');
-            for (var i = 0; i < vars.length; i++) {
-                var pair = vars[i].split('=');
-                if (pair[0]) params[pair[0].toLowerCase()] = decodeURIComponent(pair[1] || '');
-            }
-            return params;
+        let targetUrl = '';
+        let targetText = '';
+
+        if (channel === 'wa') {
+            document.getElementById('platformTitle').innerText = 'WhatsApp 业务洽谈';
+            // 使用 display 优先，确保和网页上锁定格式一模一样
+            targetText = display ? decodeURIComponent(display) : phone; 
+            document.getElementById('displayNumber').innerText = targetText;
+            targetUrl = `https://wa.me/${phone}`;
+            document.getElementById('manualBtn').href = targetUrl;
+        } else if (channel === 'tg') {
+            document.body.classList.add('is-tg');
+            document.getElementById('platformTitle').innerText = 'Telegram 业务洽谈';
+            targetText = account;
+            document.getElementById('displayNumber').innerText = '@' + targetText;
+            targetUrl = `https://t.me/${account}`;
+            document.getElementById('manualBtn').href = targetUrl;
+        } else {
+            document.getElementById('displayNumber').innerText = 'Error: No Account Info';
         }
 
-        const params = getQueryParams();
-        let channel = params.channel || 'wa'; // 默认频道为 wa
-        let phone = params.phone || '';
-        let account = params.account || '';
-
-        // 3. ✨ 核心逻辑：如果直接打开网址没带参数，触发自身随机分配
-        if (channel === 'wa' && !phone) {
-            phone = waPool[Math.floor(Math.random() * waPool.length)];
-        } else if (channel === 'tg' && !account) {
-            account = tgPool[Math.floor(Math.random() * tgPool.length)];
-        }
-
-        let targetUrl = "";
-        let schemeUrl = ""; 
-        let displayText = "";
-
-        const btn = document.getElementById('manualBtn');
-        const copyBox = document.getElementById('copyBox');
-        const accountText = document.getElementById('accountText');
-
-        // 4. UI 与跳转链接构建
-        if (channel === 'wa' && phone) {
-            const cleanPhone = phone.replace(/[^\d]/g, '');
-            targetUrl = "https://wa.me/" + cleanPhone;
-            schemeUrl = "whatsapp://send?phone=" + cleanPhone; // 底层防拦截协议
-            displayText = "+" + cleanPhone;
-
-            btn.classList.add('wa');
-            btn.innerText = "Open WhatsApp";
-            btn.style.display = "flex";
-            document.getElementById('loader').style.borderTopColor = "#25D366";
-
-        } else if (channel === 'tg' && account) {
-            targetUrl = "https://t.me/" + account;
-            schemeUrl = "tg://resolve?domain=" + account; // 底层防拦截协议
-            displayText = "@" + account;
-
-            btn.classList.add('tg');
-            btn.innerText = "Open Telegram";
-            btn.style.display = "flex";
-            document.getElementById('loader').style.borderTopColor = "#0088cc";
-        }
-
-        // 5. 渲染防拦截兜底 UI (复制号码框)
-        if (displayText) {
-            accountText.innerText = displayText;
-            copyBox.style.display = "flex";
-        }
-
-        // 6. 一键复制功能
-        window.copyAccount = function() {
-            // 复制时去掉前端的 + 或 @ 符号，方便客户直接粘贴到通讯录搜索
-            const textToCopy = accountText.innerText.replace('+', '').replace('@', '');
-            const textArea = document.createElement("textarea");
-            textArea.value = textToCopy;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                const toast = document.getElementById('toast');
-                toast.style.display = "block";
-                setTimeout(() => { toast.style.display = "none"; }, 2000);
-            } catch (err) {
-                alert("Failed to copy. Please copy manually.");
-            }
-            document.body.removeChild(textArea);
-        };
-
-        // 7. 智能执行跳转
-        if (targetUrl !== "") {
-            btn.href = targetUrl;
-            
-            // 延迟 400ms 等待 UI 渲染完毕再跳
-            setTimeout(() => {
-                // 第一波：直接用底层协议冲击，若装了 App 必能唤起
-                window.location.href = schemeUrl;
-                
-                // 第二波：若 800ms 后页面没被切走(证明被拦截)，尝试通用链接
+        // 复制功能
+        function copyAccount() {
+            if (!targetText) return;
+            navigator.clipboard.writeText(targetText).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                const originalText = btn.innerText;
+                btn.innerText = '✅ 复制成功 (Copied!)';
+                btn.style.background = '#28a745';
                 setTimeout(() => {
-                    window.location.href = targetUrl;
-                    
-                    // 第三波：如果还是被拦截，通知用户手动操作
-                    setTimeout(() => {
-                        document.getElementById('loader').style.display = "none";
-                        document.getElementById('statusText').innerText = "Action Required";
-                        document.getElementById('statusText').style.color = "#d93025";
-                        document.getElementById('descText').innerHTML = "Auto-redirect blocked by your browser.<br>Please click the button or copy the number to add manually.";
-                    }, 800);
-                }, 800);
-            }, 400);
+                    btn.innerText = originalText;
+                    btn.style.background = channel === 'tg' ? '#0088cc' : '#128C7E';
+                }, 2000);
+            }).catch(err => {
+                alert('复制失败，请长按上方号码手动复制 / Failed to copy');
+            });
         }
     </script>
 </body>
