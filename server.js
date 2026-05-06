@@ -35,17 +35,7 @@ function hashMeta(val) {
     return crypto.createHash('sha256').update(val.trim().toLowerCase()).digest('hex');
 }
 
-// 自动重试
-async function retryRequest(fn, retries = 2, delay = 300) {
-    for (let i = 0; i < retries; i++) {
-        try { return await fn(); } catch (err) {
-            if (i === retries - 1) throw err;
-            await new Promise(r => setTimeout(r, delay));
-        }
-    }
-}
-
-// ✨ Meta CAPI 回传函数
+// Meta CAPI 回传函数
 async function sendToMetaCAPI(eventData) {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
@@ -89,7 +79,7 @@ async function sendToMetaCAPI(eventData) {
     }
 }
 
-// CORS 处理
+// CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -105,10 +95,16 @@ app.post('/api/log', async (req, res) => {
         const ua = req.get('User-Agent') || '';
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         
-        let tableName = 'wa_logs'; 
-        if (logData.is_website === true) tableName = 'website_logs';
-        else if (logData.is_telegram === true) tableName = 'tg_logs';
+        // --- ✨ 修正后的路由逻辑：优先判断 Telegram ---
+        let tableName = 'wa_logs'; // 默认：中间页点击
+        
+        if (logData.is_telegram === true) {
+            tableName = 'tg_logs';       // 强制分配给：网站主站 Telegram
+        } else if (logData.is_website === true) {
+            tableName = 'website_logs';  // 分配给：网站主站 WhatsApp
+        }
 
+        // 爬虫过滤
         if (ua.toLowerCase().includes('bot') || ua.toLowerCase().includes('crawl')) {
             return res.status(200).json({ success: true, skipped: 'bot' });
         }
@@ -158,19 +154,17 @@ app.post('/api/log', async (req, res) => {
             return res.status(500).json({ success: false, error: dbError.message });
         }
 
-        // ✨ 核心修复：在这里使用 await 确保 Meta 回传完成，防止 Vercel 提前杀死进程
+        // 5. 等待 Meta 回传
         if (['website_logs', 'tg_logs'].includes(tableName) && insertedRows && insertedRows[0]) {
             const status = await sendToMetaCAPI({
                 url: pageUrl, ip: visitorIP, ua: ua,
                 fbc: logData.fbc, fbp: logData.fbp,
                 country: insertData.country, city: insertData.city
             });
-            
-            // 更新最终状态
+            // 更新数据库
             await supabase.from(tableName).update({ meta_capi_status: status }).eq('id', insertedRows[0].id);
         }
 
-        // 5. 此时再返回响应给浏览器
         res.status(200).json({ success: true });
 
     } catch (error) {
@@ -185,10 +179,8 @@ app.get('/api/backfill', async (req, res) => {
     if (pwd !== '123456') return res.status(403).send('Auth Failed');
     const tName = table === 'website' ? 'website_logs' : (table === 'tg' ? 'tg_logs' : null);
     if (!tName) return res.send('Table invalid');
-
     const { data: logs } = await supabase.from(tName).select('*').or('meta_capi_status.is.null,meta_capi_status.eq.Pending,meta_capi_status.ilike.%Error%').limit(10);
     if (!logs || logs.length === 0) return res.send('All caught up');
-
     for (const item of logs) {
         let pUrl = item.referrer_url || '';
         if (item.note && item.note.includes(' | ')) pUrl = item.note.split(' | ').slice(2).join(' | ');
