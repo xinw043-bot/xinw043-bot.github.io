@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,8 +7,8 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;}
         .card { background: #fff; padding: 30px 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 380px; text-align: center; }
-        h2 { margin-top: 0; color: #333; font-size: 22px; }
-        .warning-box { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; margin-bottom: 20px; text-align: left; }
+        h2 { margin-top: 0; color: #333; font-size: 22px; margin-bottom: 20px; }
+        .warning-box { background: #fff3cd; color: #856404; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; margin-bottom: 20px; text-align: left; }
         .number-box { background: #f0f2f5; padding: 15px; border-radius: 8px; font-size: 20px; font-weight: bold; letter-spacing: 0.5px; margin: 0 0 20px 0; color: #128C7E; word-break: break-all; }
         .btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 14px; border-radius: 25px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 12px; text-decoration: none; transition: 0.2s; box-sizing: border-box; }
         .btn-copy { background: #128C7E; color: #fff; box-shadow: 0 4px 15px rgba(18, 140, 126, 0.3); }
@@ -24,62 +24,58 @@
         <h2 id="platformTitle">WhatsApp</h2>
         
         <div class="warning-box">
-            <b>安全提示：</b><br>
-            检测到您在微信/Messenger内浏览，平台可能拦截了自动跳转。<br>
-            👉 <b>请点击右上角 [在浏览器中打开 / Open in Safari]</b><br>
-            👉 或者直接复制下方业务员账号进行洽谈：
+            If the redirect fails, please open this page in your browser or copy the account below to continue.
         </div>
 
-        <!-- 这里展示我们在第一步锁定好的，百分之百一致的账号 -->
         <div class="number-box" id="displayNumber">Loading...</div>
 
-        <button class="btn btn-copy" onclick="copyAccount()">复制账号 (Copy Account)</button>
-        <a href="#" class="btn btn-outline" id="manualBtn">尝试手动唤起 (Try Open)</a>
+        <button class="btn btn-copy" onclick="copyAccount()">Copy Account</button>
+        <a href="#" class="btn btn-outline" id="manualBtn">Open in WhatsApp</a>
     </div>
 
     <script>
-        // 获取从 Shopify 传过来的参数
         const params = new URLSearchParams(window.location.search);
         const channel = params.get('channel');
-        const phone = params.get('phone'); // 纯数字
-        const display = params.get('display'); // 带空格和+号的展示格式
-        const account = params.get('account'); // Telegram 账号
+        const phone = params.get('phone'); 
+        const display = params.get('display'); 
+        const account = params.get('account'); 
 
         let targetUrl = '';
         let targetText = '';
 
         if (channel === 'wa') {
-            document.getElementById('platformTitle').innerText = 'WhatsApp 业务洽谈';
-            // 使用 display 优先，确保和网页上锁定格式一模一样
+            document.getElementById('platformTitle').innerText = 'WhatsApp';
             targetText = display ? decodeURIComponent(display) : phone; 
             document.getElementById('displayNumber').innerText = targetText;
             targetUrl = `https://wa.me/${phone}`;
             document.getElementById('manualBtn').href = targetUrl;
+            document.getElementById('manualBtn').innerText = 'Open in WhatsApp';
         } else if (channel === 'tg') {
             document.body.classList.add('is-tg');
-            document.getElementById('platformTitle').innerText = 'Telegram 业务洽谈';
+            document.getElementById('platformTitle').innerText = 'Telegram';
             targetText = account;
             document.getElementById('displayNumber').innerText = '@' + targetText;
             targetUrl = `https://t.me/${account}`;
             document.getElementById('manualBtn').href = targetUrl;
+            document.getElementById('manualBtn').innerText = 'Open in Telegram';
         } else {
-            document.getElementById('displayNumber').innerText = 'Error: No Account Info';
+            document.getElementById('displayNumber').innerText = 'No Account Info';
+            document.getElementById('manualBtn').style.display = 'none';
         }
 
-        // 复制功能
         function copyAccount() {
             if (!targetText) return;
             navigator.clipboard.writeText(targetText).then(() => {
                 const btn = document.querySelector('.btn-copy');
-                const originalText = btn.innerText;
-                btn.innerText = '✅ 复制成功 (Copied!)';
+                const originalText = 'Copy Account';
+                btn.innerText = '✅ Copied!';
                 btn.style.background = '#28a745';
                 setTimeout(() => {
                     btn.innerText = originalText;
                     btn.style.background = channel === 'tg' ? '#0088cc' : '#128C7E';
                 }, 2000);
             }).catch(err => {
-                alert('复制失败，请长按上方号码手动复制 / Failed to copy');
+                alert('Failed to copy');
             });
         }
     </script>
