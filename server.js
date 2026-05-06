@@ -6,26 +6,36 @@ const crypto = require('crypto');
 const app = express();
 app.use(bodyParser.json());
 
+// 环境变量
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseKey = process.env.SUPABASE_KEY; 
 let supabase = null;
 
 if (supabaseUrl && supabaseKey) {
-    try { supabase = createClient(supabaseUrl, supabaseKey); } catch (e) { console.error("Supabase Init Error:", e); }
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+    } catch (e) {
+        console.error("Supabase Init Error:", e);
+    }
 }
 
+// 工具：北京时间
 function getBeijingTime() {
     return new Date().toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
     }).replace(/\//g, '-'); 
 }
 
+// 工具：Meta SHA256 加密
 function hashMeta(val) {
     if (!val || val === 'Unknown' || val === 'NULL') return undefined;
     return crypto.createHash('sha256').update(val.trim().toLowerCase()).digest('hex');
 }
 
+// 工具：重试逻辑
 async function retryRequest(fn, retries = 3, delay = 500) {
     for (let i = 0; i < retries; i++) {
         try { return await fn(); } catch (err) {
@@ -35,16 +45,17 @@ async function retryRequest(fn, retries = 3, delay = 500) {
     }
 }
 
+// ✨ Meta CAPI 回传函数 (严格限制字段：ip/ua/country/city/fbc/fbp)
 async function sendToMetaCAPI(eventData) {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
     if (!pixelId || !token) return "Skipped: No Meta Credentials";
 
-    const fieldsReport = ['ip', 'ua'];
-    if (eventData.fbc) fieldsReport.push('fbc');
-    if (eventData.fbp) fieldsReport.push('fbp');
-    if (eventData.country && eventData.country !== 'Unknown') fieldsReport.push('country');
-    if (eventData.city && eventData.city !== 'Unknown') fieldsReport.push('city');
+    const reportFields = ['ip', 'ua'];
+    if (eventData.fbc) reportFields.push('fbc');
+    if (eventData.fbp) reportFields.push('fbp');
+    if (eventData.country && eventData.country !== 'Unknown') reportFields.push('country');
+    if (eventData.city && eventData.city !== 'Unknown') reportFields.push('city');
 
     return await retryRequest(async () => {
         const payload = {
@@ -69,10 +80,11 @@ async function sendToMetaCAPI(eventData) {
         });
         const resJson = await response.json();
         if (resJson.error) throw new Error(resJson.error.message);
-        return `Success | Sent: ${fieldsReport.join(',')}`;
-    }).catch(err => `Error: ${err.message}`);
+        return `Success | Sent: ${reportFields.join(',')}`;
+    }).catch(err => `Error After Retries: ${err.message}`);
 }
 
+// CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -81,16 +93,25 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- 接口 1: 写入接口 ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
         const ua = req.get('User-Agent') || '';
         const uaLower = ua.toLowerCase();
         
-        let tableName = 'wa_logs';
-        if (logData.is_telegram === true) tableName = 'tg_logs';
-        else if (logData.is_website === true) tableName = 'website_logs';
+        // 修正后的分表逻辑
+        let tableName = 'wa_logs'; // 默认分配给中间页点击
+        if (logData.is_website === true) {
+            tableName = 'website_logs'; // 网站主站 WhatsApp
+        } else if (logData.is_telegram === true) {
+            tableName = 'tg_logs'; // 网站主站 Telegram
+        }
 
+        // ✨ 仅允许 website_logs (主站WA) 和 tg_logs (主站TG) 回传 Meta
+        const metaEnabledTables = ['website_logs', 'tg_logs']; 
+
+        // 爬虫拦截
         const botKeywords = ['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'python'];
         if (botKeywords.some(keyword => uaLower.includes(keyword))) {
             return res.status(200).send({ success: true, skipped: true });
@@ -102,22 +123,21 @@ app.post('/api/log', async (req, res) => {
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         const bjTime = getBeijingTime();
 
-        if (!supabase) return res.status(200).send({ success: false, error: "Supabase not connected" });
+        if (!supabase) return res.status(200).send({ success: false });
 
-        // 1. 查重
+        // 1. 后端精准查重 (IP + fbp)
         let visitCount = 1;
         let queryConditions = [];
         if (visitorIP) queryConditions.push(`ip.eq.${visitorIP}`);
         if (logData.fbp) queryConditions.push(`fbp.eq.${logData.fbp}`);
-        if (logData.cet_uid) queryConditions.push(`cet_uid.eq.${logData.cet_uid}`);
         if (queryConditions.length > 0) {
             const { data: pastLogs } = await supabase.from(tableName).select('id').or(queryConditions.join(','));
             if (pastLogs && pastLogs.length > 0) visitCount = pastLogs.length + 1;
         }
 
-        // 2. Note 重写
-        let actionPrefix = logData.is_website ? 'Form' : 'Chat';
-        let pageUrl = logData.referrer_url || '';
+        // 2. Note 重新拼接
+        let actionPrefix = logData.is_website ? 'WA_MainSite' : (logData.is_telegram ? 'TG_MainSite' : 'Intermediate_Page');
+        let pageUrl = logData.referrer_url || 'Direct';
         if (logData.note && logData.note.includes(' | ')) {
             const parts = logData.note.split(' | ');
             actionPrefix = parts[0];
@@ -125,61 +145,56 @@ app.post('/api/log', async (req, res) => {
         }
         const finalNote = `${actionPrefix} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
 
-        // 3. Meta CAPI
-        let capiStatus = "Skipped: CAPI only for website/tg logs";
-        const metaEnabledTables = ['website_logs', 'tg_logs']; 
+        // 3. Meta CAPI 实时回传过滤
+        let capiStatus = "Skipped: Intermediate Page";
         if (metaEnabledTables.includes(tableName)) {
             capiStatus = await sendToMetaCAPI({ url: pageUrl, ip: visitorIP, ua: ua, fbc: logData.fbc, fbp: logData.fbp, country: country, city: city });
         }
 
-        // 4. ✨ 容错写入逻辑：构建要插入的数据对象
-        const insertObject = {
-            phone_number: logData.phoneNumber,
-            redirect_time: bjTime,
-            ip: visitorIP,
-            country: country,
-            city: city,
-            user_agent: ua,
-            language: logData.language || 'en',
-            inquiry_id: logData.inquiryId || 'N/A',
-            note: finalNote,
-            referrer_url: logData.referrer_url || 'Direct',
-            fbc: logData.fbc || null,
-            fbp: logData.fbp || null,
-            gclid: logData.gclid || null,
-            wbraid: logData.wbraid || null,
-            gbraid: logData.gbraid || null,
-            gcl_au: logData.gcl_au || null,
-            cet_uid: logData.cet_uid || null,
-            meta_capi_status: capiStatus
-        };
-
-        const { error } = await supabase.from(tableName).insert([insertObject]);
-
-        if (error) {
-            console.error(`Supabase Insert Error (${tableName}):`, error.message);
-            // 如果报错是字段不存在，尝试只插入基础字段以保住数据
-            if (error.message.includes('column') && error.message.includes('does not exist')) {
-                console.log("Retrying with minimal fields...");
-                await supabase.from(tableName).insert([{ 
-                    phone_number: logData.phoneNumber, 
-                    ip: visitorIP, 
-                    note: finalNote,
-                    inquiry_id: logData.inquiryId
-                }]);
-            }
-            throw error;
-        }
+        // 4. 入库
+        await retryRequest(async () => {
+            const { error } = await supabase.from(tableName).insert([{
+                phone_number: logData.phoneNumber, redirect_time: bjTime, ip: visitorIP, country: country, city: city, 
+                user_agent: ua, language: logData.language || 'en', inquiry_id: logData.inquiryId || 'N/A', 
+                note: finalNote, referrer_url: logData.referrer_url || 'Direct', 
+                fbc: logData.fbc || null, fbp: logData.fbp || null, gclid: logData.gclid || null,
+                wbraid: logData.wbraid || null, gbraid: logData.gbraid || null, gcl_au: logData.gcl_au || null,
+                meta_capi_status: capiStatus
+            }]);
+            if (error) throw error;
+        });
 
         res.status(200).send({ success: true });
     } catch (error) {
-        console.error("API Error:", error);
-        res.status(200).send({ success: false, message: error.message });
+        res.status(200).send({ success: false, msg: error.message });
     }
 });
 
-// 其他查询接口保持不变...
+// --- 接口 2: 存量补发接口 (仅限主站渠道) ---
+app.get('/api/backfill', async (req, res) => {
+    const { pwd, table } = req.query;
+    if (pwd !== '123456') return res.status(403).send('Auth Failed');
+    
+    // 只能补发这主站两个表的数据
+    const tName = table === 'website' ? 'website_logs' : (table === 'tg' ? 'tg_logs' : null);
+    if (!tName) return res.status(400).send('Invalid Table. Use website or tg');
+
+    try {
+        const { data: logs, error: fetchErr } = await supabase
+            .from(tName).select('*').or('meta_capi_status.is.null,meta_capi_status.ilike.%Error%,meta_capi_status.ilike.%Skipped%').limit(20);
+        if (!logs || logs.length === 0) return res.send('All matched.');
+        for (const item of logs) {
+            let pUrl = item.referrer_url || '';
+            if (item.note && item.note.includes(' | ')) pUrl = item.note.split(' | ').slice(2).join(' | ');
+            const resCapi = await sendToMetaCAPI({ url: pUrl, ip: item.ip, ua: item.user_agent, fbc: item.fbc, fbp: item.fbp, country: item.country, city: item.city });
+            await supabase.from(tName).update({ meta_capi_status: `Backfilled: ${resCapi}` }).eq('id', item.id);
+        }
+        res.json({ success: true, processed: logs.length });
+    } catch (e) { res.status(500).send(e.message); }
+});
+
+// 其他接口保持不变...
+app.get('/api/check-phone', async (req, res) => { /*...*/ });
 app.get('/api/logs', async (req, res) => { /*...*/ });
-app.get('/api/backfill', async (req, res) => { /*...*/ });
 
 module.exports = app;
