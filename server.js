@@ -1,20 +1,25 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
-const app = express();
+const crypto = require('crypto');
 
+const app = express();
 app.use(bodyParser.json());
 
+// 环境变量
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseKey = process.env.SUPABASE_KEY; 
 let supabase = null;
 
 if (supabaseUrl && supabaseKey) {
     try {
         supabase = createClient(supabaseUrl, supabaseKey);
-    } catch (e) {}
+    } catch (e) {
+        console.error("Supabase Init Error:", e);
+    }
 }
 
+// 获取北京时间
 function getBeijingTime() {
     return new Date().toLocaleString('zh-CN', {
         timeZone: 'Asia/Shanghai',
@@ -24,150 +29,215 @@ function getBeijingTime() {
     }).replace(/\//g, '-'); 
 }
 
-// --- 核心修复：CORS 预检深度处理 ---
+// Meta 专用 SHA256 加密
+function hashMeta(val) {
+    if (!val || val === 'Unknown' || val === 'NULL') return undefined;
+    return crypto.createHash('sha256').update(val.trim().toLowerCase()).digest('hex');
+}
+
+// 网络请求重试装饰器
+async function retryRequest(fn, retries = 3, delay = 500) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+}
+
+// ✨ Meta CAPI 回传函数 (严格限定回传字段)
+async function sendToMetaCAPI(eventData) {
+    const pixelId = process.env.META_PIXEL_ID;
+    const token = process.env.META_ACCESS_TOKEN;
+    
+    if (!pixelId || !token) return "Skipped: No Meta Credentials";
+
+    // 统计本次回传的有效匹配字段
+    const fieldsReport = ['ip', 'ua'];
+    if (eventData.fbc) fieldsReport.push('fbc');
+    if (eventData.fbp) fieldsReport.push('fbp');
+    if (eventData.country && eventData.country !== 'Unknown') fieldsReport.push('country');
+    if (eventData.city && eventData.city !== 'Unknown') fieldsReport.push('city');
+
+    return await retryRequest(async () => {
+        const payload = {
+            data: [{
+                event_name: 'Lead',
+                event_time: Math.floor(Date.now() / 1000),
+                action_source: 'website',
+                event_source_url: eventData.url,
+                user_data: {
+                    // 严格只回传要求的 6 类字段
+                    client_ip_address: eventData.ip,
+                    client_user_agent: eventData.ua,
+                    fbc: eventData.fbc || undefined, // 无数据则不传输该 Key
+                    fbp: eventData.fbp || undefined, // 无数据则不传输该 Key
+                    country: hashMeta(eventData.country),
+                    ct: hashMeta(eventData.city)
+                }
+            }]
+        };
+
+        const response = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const resJson = await response.json();
+        if (resJson.error) throw new Error(resJson.error.message);
+        return `Success | Sent: ${fieldsReport.join(',')}`;
+    }).catch(err => `Error After Retries: ${err.message}`);
+}
+
+// CORS 跨域配置
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // 2月后失效主因：OPTIONS 必须直接返回 204/200，不能进入后续路由
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(204);
-    }
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
 });
 
-// --- 查重接口 (保持原样) ---
-app.get('/api/check-phone', async (req, res) => {
-    try {
-        if (!supabase) return res.json({ found: false });
-        const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
-        const { data: tgData } = await supabase.from('tg_logs').select('phone_number').eq('ip', visitorIP).order('id', { ascending: false }).limit(1);
-        if (tgData && tgData.length > 0) return res.json({ found: true, phone: tgData[0].phone_number, source: 'tg' });
-        const { data: webData } = await supabase.from('website_logs').select('phone_number').eq('ip', visitorIP).order('id', { ascending: false }).limit(1);
-        if (webData && webData.length > 0) return res.json({ found: true, phone: webData[0].phone_number, source: 'website' });
-        const { data: waData } = await supabase.from('wa_logs').select('phone_number').eq('ip', visitorIP).order('id', { ascending: false }).limit(1);
-        if (waData && waData.length > 0) return res.json({ found: true, phone: waData[0].phone_number, source: 'landing' });
-        return res.json({ found: false });
-    } catch (error) { res.json({ found: false }); }
-});
-
-// --- 写入接口 (已补充精准查重与 Note 重写逻辑) ---
+// --- 接口 1: 核心日志记录与实时回传 ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
         const ua = req.get('User-Agent') || '';
         const uaLower = ua.toLowerCase();
         
-        // 分表逻辑
+        // 1. 自动分表逻辑
         let tableName = 'wa_logs';
         if (logData.is_telegram === true) tableName = 'tg_logs';
         else if (logData.is_website === true) tableName = 'website_logs';
 
-        // 爬虫拦截
-        const botKeywords =['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'python'];
+        // 2. 爬虫过滤
+        const botKeywords = ['bot', 'spider', 'crawl', 'facebook', 'meta', 'whatsapp', 'preview', 'google', 'twitter', 'slack', 'python'];
         if (botKeywords.some(keyword => uaLower.includes(keyword))) {
-            return res.status(200).send({ success: true, skipped: true });
+            return res.status(200).send({ success: true, skipped: true, reason: 'bot_detected' });
         }
 
+        // 3. 环境属性抓取
         const country = req.headers['x-vercel-ip-country'] || 'Unknown';
         let city = req.headers['x-vercel-ip-city'] || 'Unknown';
         try { city = decodeURIComponent(city); } catch (e) {}
-        
-        // 后端直接抓取最真实 IP，防前端伪造
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         const bjTime = getBeijingTime();
 
         if (!supabase) return res.status(200).send({ success: false });
 
-        // ==========================================
-        // ✨ 1. 后端精准查重：利用 IP 和 Cookie (fbp) 
-        // ==========================================
-        let visitCount = 1; // 默认为 1
-        let queryConditions =[];
-        
-        // 构建 OR 查询条件：IP 相同，或者 fbp(Cookie) 相同，都算作同一个人
+        // 4. 后端精准查重 (IP + fbp + userId)
+        let visitCount = 1;
+        let queryConditions = [];
         if (visitorIP) queryConditions.push(`ip.eq.${visitorIP}`);
         if (logData.fbp) queryConditions.push(`fbp.eq.${logData.fbp}`);
+        if (logData.cet_uid) queryConditions.push(`cet_uid.eq.${logData.cet_uid}`);
 
         if (queryConditions.length > 0) {
-            const orQuery = queryConditions.join(',');
-            // 去数据库中检索这个人的历史记录数量
-            const { data: pastLogs, error: searchError } = await supabase
-                .from(tableName)
-                .select('id')
-                .or(orQuery);
-            
-            if (!searchError && pastLogs && pastLogs.length > 0) {
-                visitCount = pastLogs.length + 1; // 查到了历史记录，加上当前的这一次
-            }
+            const { data: pastLogs } = await supabase.from(tableName).select('id').or(queryConditions.join(','));
+            if (pastLogs && pastLogs.length > 0) visitCount = pastLogs.length + 1;
         }
 
-        // ==========================================
-        // ✨ 2. 重写 Note 字段格式 (剥离出带长参数的 URL)
-        // ==========================================
-        let actionPrefix = 'Chat';
+        // 5. Note 字段格式格式化
+        let actionPrefix = logData.is_website ? 'Form' : 'Chat';
         let pageUrl = logData.referrer_url || '';
-
-        // 前端传来的格式通常是: "Chat | New User | https://cethermal.com/?utm_source..."
-        if (logData.note) {
+        if (logData.note && logData.note.includes(' | ')) {
             const parts = logData.note.split(' | ');
-            if (parts.length >= 3) {
-                actionPrefix = parts[0]; // 提取动作 (Chat 或 Form)
-                pageUrl = parts.slice(2).join(' | '); // 提取最后面的完整长链接(即使链接里包含 | 也能正确合并)
-            } else {
-                pageUrl = logData.note; // 如果格式异常，作为兜底
-            }
+            actionPrefix = parts[0];
+            pageUrl = parts.slice(2).join(' | ');
+        }
+        const finalNote = `${actionPrefix} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
+
+        // 6. Meta CAPI 逻辑执行 (仅限 website 和 tg 表)
+        let capiStatus = "Skipped: CAPI only for website/tg logs";
+        const metaEnabledTables = ['website_logs', 'tg_logs']; 
+        if (metaEnabledTables.includes(tableName)) {
+            capiStatus = await sendToMetaCAPI({
+                url: pageUrl,
+                ip: visitorIP,
+                ua: ua,
+                fbc: logData.fbc,
+                fbp: logData.fbp,
+                country: country,
+                city: city
+            });
         }
 
-        // 根据后端查重结果生成绝对精准的状态
-        const trueStatus = visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User';
-        
-        // 组装成您要求的最终格式: 
-        // Chat | Old User (Click #2) | https://cethermal.com/?utm_source=fb...
-        const finalNote = `${actionPrefix} | ${trueStatus} | ${pageUrl}`;
-
-
-        // ==========================================
-        // ✨ 3. 执行最终写入
-        // ==========================================
-        const { error } = await supabase
-            .from(tableName)
-            .insert({
-                phone_number: logData.phoneNumber, 
+        // 7. 最终入库 (全字段对齐)
+        await retryRequest(async () => {
+            const { error } = await supabase.from(tableName).insert({
+                phone_number: logData.phoneNumber, // 注意：此处记录的是分配的业务员账号
                 redirect_time: bjTime,
-                ip: visitorIP, 
+                ip: visitorIP,
                 country: country,
                 city: city,
-                user_agent: ua, 
+                user_agent: ua,
                 language: logData.language || 'en',
                 inquiry_id: logData.inquiryId || 'N/A',
-                note: finalNote,  // <--- 写入重写后的精准 Note !!!
-                referrer_url: logData.referrer_url || 'Direct', 
+                note: finalNote,
+                referrer_url: logData.referrer_url || 'Direct',
                 fbc: logData.fbc || null,
                 fbp: logData.fbp || null,
                 gclid: logData.gclid || null,
                 wbraid: logData.wbraid || null,
                 gbraid: logData.gbraid || null,
-                gcl_au: logData.gcl_au || null
+                gcl_au: logData.gcl_au || null,
+                cet_uid: logData.cet_uid || null,
+                meta_capi_status: capiStatus
             });
+            if (error) throw error;
+        });
 
-        if (error) throw error;
         res.status(200).send({ success: true });
     } catch (error) {
+        console.error("Critical API Error:", error);
         res.status(200).send({ success: false });
     }
 });
 
-// 日志查询 (保持原样)
+// --- 接口 2: 存量数据补发补偿 ---
+app.get('/api/backfill', async (req, res) => {
+    const { pwd, table } = req.query;
+    if (pwd !== '123456') return res.status(403).send('🔒 Auth Failed');
+    const tableName = table === 'website' ? 'website_logs' : (table === 'tg' ? 'tg_logs' : null);
+    if (!tableName) return res.status(400).send('Use ?table=website or ?table=tg');
+
+    try {
+        const { data: logs, error: fetchErr } = await supabase
+            .from(tableName)
+            .select('*')
+            .or('meta_capi_status.is.null,meta_capi_status.ilike.%Error%,meta_capi_status.ilike.%Skipped%')
+            .order('id', { ascending: false }).limit(20);
+
+        if (fetchErr) throw fetchErr;
+        if (!logs || logs.length === 0) return res.send('No logs need backfilling.');
+
+        let processed = 0;
+        for (const item of logs) {
+            let pUrl = item.referrer_url || '';
+            if (item.note && item.note.includes(' | ')) pUrl = item.note.split(' | ').slice(2).join(' | ');
+            const resCapi = await sendToMetaCAPI({
+                url: pUrl, ip: item.ip, ua: item.user_agent,
+                fbc: item.fbc, fbp: item.fbp, country: item.country, city: item.city
+            });
+            await supabase.from(tableName).update({ meta_capi_status: `Backfilled: ${resCapi}` }).eq('id', item.id);
+            processed++;
+        }
+        res.json({ success: true, processed, table: tableName });
+    } catch (e) { res.status(500).send(e.message); }
+});
+
+// --- 接口 3: 存量日志快速预览 ---
 app.get('/api/logs', async (req, res) => {
     if (!supabase) return res.send('Config Error');
-    if (req.query.pwd !== '123456') return res.send('🔒 Password Error');
-    let tableName = 'wa_logs';
-    if (req.query.table === 'website') tableName = 'website_logs';
-    if (req.query.table === 'tg') tableName = 'tg_logs';
+    if (req.query.pwd !== '123456') return res.send('Password Error');
+    let tName = 'wa_logs';
+    if (req.query.table === 'website') tName = 'website_logs';
+    if (req.query.table === 'tg') tName = 'tg_logs';
     try {
-        const { data: logs } = await supabase.from(tableName).select('*').order('id', { ascending: false }).limit(50);
+        const { data: logs } = await supabase.from(tName).select('*').order('id', { ascending: false }).limit(50);
         res.json(logs);
     } catch (error) { res.status(500).send(error.message); }
 });
