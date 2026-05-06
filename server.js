@@ -35,11 +35,21 @@ function hashMeta(val) {
     return crypto.createHash('sha256').update(val.trim().toLowerCase()).digest('hex');
 }
 
-// Meta CAPI 回传函数
+// 自动重试
+async function retryRequest(fn, retries = 2, delay = 300) {
+    for (let i = 0; i < retries; i++) {
+        try { return await fn(); } catch (err) {
+            if (i === retries - 1) throw err;
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+}
+
+// ✨ Meta CAPI 回传函数
 async function sendToMetaCAPI(eventData) {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
-    if (!pixelId || !token) return "Skipped: No Meta Credentials";
+    if (!pixelId || !token) return "Skipped: No Credentials";
 
     const reportFields = ['ip', 'ua'];
     if (eventData.fbc) reportFields.push('fbc');
@@ -64,10 +74,13 @@ async function sendToMetaCAPI(eventData) {
                 }
             }]
         };
+
         const response = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+
         const resJson = await response.json();
         if (resJson.error) return `Meta Error: ${resJson.error.message}`;
         return `Success | Sent: ${reportFields.join(',')}`;
@@ -92,31 +105,30 @@ app.post('/api/log', async (req, res) => {
         const ua = req.get('User-Agent') || '';
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         
-        // 1. 分表逻辑
-        let tableName = 'wa_logs'; // 默认中间页
-        if (logData.is_website === true) {
-            tableName = 'website_logs'; // 网站主站 WhatsApp
-        } else if (logData.is_telegram === true) {
-            tableName = 'tg_logs'; // 网站主站 Telegram
+        let tableName = 'wa_logs'; 
+        if (logData.is_website === true) tableName = 'website_logs';
+        else if (logData.is_telegram === true) tableName = 'tg_logs';
+
+        if (ua.toLowerCase().includes('bot') || ua.toLowerCase().includes('crawl')) {
+            return res.status(200).json({ success: true, skipped: 'bot' });
         }
 
-        // 2. 查重及 Note 生成 (彻底删除 cet_uid 引用)
+        if (!supabase) return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
+
+        // 1. 查重
         let visitCount = 1;
         let queryStr = `ip.eq.${visitorIP}`;
         if (logData.fbp) queryStr += `,fbp.eq.${logData.fbp}`;
-
         const { data: pastLogs } = await supabase.from(tableName).select('id').or(queryStr);
         if (pastLogs && pastLogs.length > 0) visitCount = pastLogs.length + 1;
 
+        // 2. Note 生成
         let pageUrl = logData.referrer_url || 'Direct';
-        if (logData.note && logData.note.includes(' | ')) {
-            pageUrl = logData.note.split(' | ').slice(2).join(' | ');
-        }
-        
+        if (logData.note && logData.note.includes(' | ')) pageUrl = logData.note.split(' | ').slice(2).join(' | ');
         const actionTag = tableName === 'website_logs' ? 'WA_Main' : (tableName === 'tg_logs' ? 'TG_Main' : 'Intermediate');
         const finalNote = `${actionTag} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
 
-        // 3. 构建写入对象 (严格对齐你的截图字段，彻底移除 cet_uid)
+        // 3. 构建插入对象
         const insertData = {
             phone_number: logData.phoneNumber,
             redirect_time: getBeijingTime(),
@@ -136,36 +148,33 @@ app.post('/api/log', async (req, res) => {
             gcl_au: logData.gcl_au || null
         };
 
-        // 只有主站两个表包含此字段，wa_logs (中间页) 不包含
-        if (tableName !== 'wa_logs') {
-            insertData.meta_capi_status = "Pending";
-        }
+        if (tableName !== 'wa_logs') insertData.meta_capi_status = "Pending";
 
         // 4. 执行写入
         const { data: insertedRows, error: dbError } = await supabase.from(tableName).insert([insertData]).select();
 
         if (dbError) {
-            console.error(`Supabase Insert Error:`, dbError.message);
+            console.error("Supabase Error:", dbError.message);
             return res.status(500).json({ success: false, error: dbError.message });
         }
 
-        // 5. 触发 Meta 回传并更新状态
-        if (['website_logs', 'tg_logs'].includes(tableName)) {
-            sendToMetaCAPI({
+        // ✨ 核心修复：在这里使用 await 确保 Meta 回传完成，防止 Vercel 提前杀死进程
+        if (['website_logs', 'tg_logs'].includes(tableName) && insertedRows && insertedRows[0]) {
+            const status = await sendToMetaCAPI({
                 url: pageUrl, ip: visitorIP, ua: ua,
                 fbc: logData.fbc, fbp: logData.fbp,
                 country: insertData.country, city: insertData.city
-            }).then(status => {
-                if (insertedRows && insertedRows[0]) {
-                    supabase.from(tableName).update({ meta_capi_status: status }).eq('id', insertedRows[0].id).then(()=>{});
-                }
             });
+            
+            // 更新最终状态
+            await supabase.from(tableName).update({ meta_capi_status: status }).eq('id', insertedRows[0].id);
         }
 
+        // 5. 此时再返回响应给浏览器
         res.status(200).json({ success: true });
 
     } catch (error) {
-        console.error("Critical API Error:", error);
+        console.error("Global API Error:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -177,7 +186,7 @@ app.get('/api/backfill', async (req, res) => {
     const tName = table === 'website' ? 'website_logs' : (table === 'tg' ? 'tg_logs' : null);
     if (!tName) return res.send('Table invalid');
 
-    const { data: logs } = await supabase.from(tName).select('*').or('meta_capi_status.is.null,meta_capi_status.eq.Pending').limit(15);
+    const { data: logs } = await supabase.from(tName).select('*').or('meta_capi_status.is.null,meta_capi_status.eq.Pending,meta_capi_status.ilike.%Error%').limit(10);
     if (!logs || logs.length === 0) return res.send('All caught up');
 
     for (const item of logs) {
