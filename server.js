@@ -95,21 +95,45 @@ app.post('/api/log', async (req, res) => {
         const ua = req.get('User-Agent') || '';
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         
-        // --- ✨ 修正后的路由逻辑：优先判断 Telegram ---
-        let tableName = 'wa_logs'; // 默认：中间页点击
-        
+        if (!supabase) return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
+
+        // --- 分支1: 处理表单提交逻辑 ---
+        if (logData.type === 'form_submission') {
+            const formData = {
+                name: logData.name,
+                email: logData.email,
+                company: logData.company,
+                phone: logData.phone,
+                page_url: logData.page_url,
+                ip: visitorIP,
+                ua: ua,
+                fbc: logData.fbc || null,
+                fbp: logData.fbp || null,
+                gclid: logData.gclid || null,
+                gcl_au: logData.gcl_au || null,
+                wbraid: logData.wbraid || null,
+                gbraid: logData.gbraid || null,
+                country: req.headers['x-vercel-ip-country'] || 'Unknown',
+                city: decodeURIComponent(req.headers['x-vercel-ip-city'] || 'Unknown')
+            };
+
+            const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
+            if (dbError) throw dbError;
+            return res.status(200).json({ success: true, type: 'form' });
+        }
+
+        // --- 分支2: Telegram / WhatsApp 点击记录 ---
+        let tableName = 'wa_logs'; 
         if (logData.is_telegram === true) {
-            tableName = 'tg_logs';       // 强制分配给：网站主站 Telegram
+            tableName = 'tg_logs';
         } else if (logData.is_website === true) {
-            tableName = 'website_logs';  // 分配给：网站主站 WhatsApp
+            tableName = 'website_logs';
         }
 
         // 爬虫过滤
         if (ua.toLowerCase().includes('bot') || ua.toLowerCase().includes('crawl')) {
             return res.status(200).json({ success: true, skipped: 'bot' });
         }
-
-        if (!supabase) return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
 
         // 1. 查重
         let visitCount = 1;
@@ -148,11 +172,7 @@ app.post('/api/log', async (req, res) => {
 
         // 4. 执行写入
         const { data: insertedRows, error: dbError } = await supabase.from(tableName).insert([insertData]).select();
-
-        if (dbError) {
-            console.error("Supabase Error:", dbError.message);
-            return res.status(500).json({ success: false, error: dbError.message });
-        }
+        if (dbError) throw dbError;
 
         // 5. 等待 Meta 回传
         if (['website_logs', 'tg_logs'].includes(tableName) && insertedRows && insertedRows[0]) {
@@ -161,7 +181,6 @@ app.post('/api/log', async (req, res) => {
                 fbc: logData.fbc, fbp: logData.fbp,
                 country: insertData.country, city: insertData.city
             });
-            // 更新数据库
             await supabase.from(tableName).update({ meta_capi_status: status }).eq('id', insertedRows[0].id);
         }
 
