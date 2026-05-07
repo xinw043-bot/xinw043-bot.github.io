@@ -99,12 +99,16 @@ app.post('/api/log', async (req, res) => {
 
         // --- 分支1: 处理表单提交逻辑 ---
         if (logData.type === 'form_submission') {
+            // --- 调试：打印日志 ---
+            console.log("收到表单数据:", JSON.stringify(logData));
+
             const formData = {
-                name: logData.name,
-                email: logData.email,
-                company: logData.company,
-                phone: logData.phone,
-                page_url: logData.page_url,
+                name: logData.name || null,
+                email: logData.email || null,
+                company: logData.company || null,
+                phone: logData.phone || null,
+                page_url: logData.page_url || null,
+                referrer_url: logData.referrer_url || null,
                 ip: visitorIP,
                 ua: ua,
                 fbc: logData.fbc || null,
@@ -118,7 +122,12 @@ app.post('/api/log', async (req, res) => {
             };
 
             const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
-            if (dbError) throw dbError;
+            
+            if (dbError) {
+                console.error("写入 Supabase 失败，错误详情:", dbError);
+                // 这里会打印具体的错误信息，比如 'column "gcl au" does not exist'
+                return res.status(500).json({ success: false, error: dbError.message, details: dbError.details });
+            }
             return res.status(200).json({ success: true, type: 'form' });
         }
 
