@@ -97,16 +97,14 @@ app.post('/api/log', async (req, res) => {
         
         if (!supabase) return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
 
-        // --- 分支1: 处理表单提交逻辑 (确保字段名与 Supabase 列名严格对应) ---
+        // --- 分支1: 处理表单提交逻辑 ---
         if (logData.type === 'form_submission') {
             const formData = {
-                name: logData.name || null,
-                email: logData.email || null,
-                company: logData.company || null,
-                phone: logData.phone || null,
-                country: logData.country || null,
-                page_url: logData.page_url || null,
-                referrer_url: logData.referrer_url || null,
+                name: logData.name,
+                email: logData.email,
+                company: logData.company,
+                phone: logData.phone,
+                page_url: logData.page_url,
                 ip: visitorIP,
                 ua: ua,
                 fbc: logData.fbc || null,
@@ -115,15 +113,12 @@ app.post('/api/log', async (req, res) => {
                 gcl_au: logData.gcl_au || null,
                 wbraid: logData.wbraid || null,
                 gbraid: logData.gbraid || null,
-                city: logData.city || decodeURIComponent(req.headers['x-vercel-ip-city'] || 'Unknown')
+                country: req.headers['x-vercel-ip-country'] || 'Unknown',
+                city: decodeURIComponent(req.headers['x-vercel-ip-city'] || 'Unknown')
             };
 
             const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
-            
-            if (dbError) {
-                console.error("写入 Supabase form_submissions 失败:", dbError);
-                return res.status(500).json({ success: false, error: dbError.message, details: dbError.details });
-            }
+            if (dbError) throw dbError;
             return res.status(200).json({ success: true, type: 'form' });
         }
 
@@ -135,21 +130,25 @@ app.post('/api/log', async (req, res) => {
             tableName = 'website_logs';
         }
 
+        // 爬虫过滤
         if (ua.toLowerCase().includes('bot') || ua.toLowerCase().includes('crawl')) {
             return res.status(200).json({ success: true, skipped: 'bot' });
         }
 
+        // 1. 查重
         let visitCount = 1;
         let queryStr = `ip.eq.${visitorIP}`;
         if (logData.fbp) queryStr += `,fbp.eq.${logData.fbp}`;
         const { data: pastLogs } = await supabase.from(tableName).select('id').or(queryStr);
         if (pastLogs && pastLogs.length > 0) visitCount = pastLogs.length + 1;
 
+        // 2. Note 生成
         let pageUrl = logData.referrer_url || 'Direct';
         if (logData.note && logData.note.includes(' | ')) pageUrl = logData.note.split(' | ').slice(2).join(' | ');
         const actionTag = tableName === 'website_logs' ? 'WA_Main' : (tableName === 'tg_logs' ? 'TG_Main' : 'Intermediate');
         const finalNote = `${actionTag} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
 
+        // 3. 构建插入对象
         const insertData = {
             phone_number: logData.phoneNumber,
             redirect_time: getBeijingTime(),
@@ -171,9 +170,11 @@ app.post('/api/log', async (req, res) => {
 
         if (tableName !== 'wa_logs') insertData.meta_capi_status = "Pending";
 
+        // 4. 执行写入
         const { data: insertedRows, error: dbError } = await supabase.from(tableName).insert([insertData]).select();
         if (dbError) throw dbError;
 
+        // 5. 等待 Meta 回传
         if (['website_logs', 'tg_logs'].includes(tableName) && insertedRows && insertedRows[0]) {
             const status = await sendToMetaCAPI({
                 url: pageUrl, ip: visitorIP, ua: ua,
@@ -191,8 +192,30 @@ app.post('/api/log', async (req, res) => {
     }
 });
 
-// --- 补发与查重接口保持不变 ---
-app.get('/api/backfill', async (req, res) => { /* ... */ });
-app.get('/api/check-phone', async (req, res) => { /* ... */ });
+// --- 补发接口 ---
+app.get('/api/backfill', async (req, res) => {
+    const { pwd, table } = req.query;
+    if (pwd !== '123456') return res.status(403).send('Auth Failed');
+    const tName = table === 'website' ? 'website_logs' : (table === 'tg' ? 'tg_logs' : null);
+    if (!tName) return res.send('Table invalid');
+    const { data: logs } = await supabase.from(tName).select('*').or('meta_capi_status.is.null,meta_capi_status.eq.Pending,meta_capi_status.ilike.%Error%').limit(10);
+    if (!logs || logs.length === 0) return res.send('All caught up');
+    for (const item of logs) {
+        let pUrl = item.referrer_url || '';
+        if (item.note && item.note.includes(' | ')) pUrl = item.note.split(' | ').slice(2).join(' | ');
+        const status = await sendToMetaCAPI({ url: pUrl, ip: item.ip, ua: item.user_agent, fbc: item.fbc, fbp: item.fbp, country: item.country, city: item.city });
+        await supabase.from(tName).update({ meta_capi_status: `Backfill: ${status}` }).eq('id', item.id);
+    }
+    res.json({ processed: logs.length });
+});
+
+// --- 查重接口 ---
+app.get('/api/check-phone', async (req, res) => {
+    try {
+        const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
+        const { data } = await supabase.from('wa_logs').select('phone_number').eq('ip', visitorIP).order('id', { ascending: false }).limit(1);
+        res.json({ found: !!(data && data.length), phone: data?.[0]?.phone_number });
+    } catch (e) { res.json({ found: false }); }
+});
 
 module.exports = app;
