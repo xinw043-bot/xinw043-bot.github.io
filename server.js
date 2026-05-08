@@ -100,7 +100,6 @@ app.post('/api/log', async (req, res) => {
         // --- 分支 1: 处理表单提交逻辑 ---
         if (logData.type === 'form_submission') {
             const formData = {
-                created_at: getBeijingTime(),
                 name: logData.name,
                 email: logData.email,
                 company: logData.company,
