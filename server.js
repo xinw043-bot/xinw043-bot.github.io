@@ -205,15 +205,21 @@ app.post('/api/webhook/supabase', async (req, res) => {
     try {
         const payload = req.body;
 
-        if (payload.type === 'UPDATE' && payload.record && payload.record.meta_capi_status === 'GO_META') {
+        // 提取状态并转为小写、去空格，防止手误输入 "gometa " 导致不触发
+        const currentStatus = payload.record?.meta_capi_status?.trim().toLowerCase();
+
+        // 当状态等于 'gometa' 时触发
+        if (payload.type === 'UPDATE' && payload.record && currentStatus === 'gometa') {
             const row = payload.record;
-            const tableName = payload.table;
+            const tableName = payload.table; // Supabase webhook 默认带有 table 字段
+
+            console.log(`[Webhook Triggered] Table: ${tableName}, Row ID: ${row.id}`); // 打印日志方便排查
 
             const status = await sendToMetaCAPI({
                 id: row.id,
-                client_phone: row.client_phone,  // ✨ 读取用户手动填入的新增列（客户真实电话）
-                email: row.email,                // 选填
-                name: row.name,                  // 选填
+                client_phone: row.client_phone,  
+                email: row.email,                
+                name: row.name,                  
                 url: row.referrer_url,
                 ip: row.ip,
                 ua: row.user_agent || row.ua,
@@ -223,8 +229,10 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 city: row.city
             });
 
+            // 把回传结果 (Success 或 Failed) 写回表格
             if (supabase) {
-                await supabase.from(tableName).update({ meta_capi_status: status }).eq('id', row.id);
+                const { error: updateErr } = await supabase.from(tableName).update({ meta_capi_status: status }).eq('id', row.id);
+                if (updateErr) console.error("[Supabase Update Error]:", updateErr);
             }
         }
 
