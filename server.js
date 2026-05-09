@@ -35,7 +35,7 @@ function hashMeta(val) {
     return crypto.createHash('sha256').update(val.toString().trim().toLowerCase()).digest('hex');
 }
 
-// 工具：Meta 电话专属加密 (去除非数字字符)
+// 工具：Meta 电话专属加密 (去除非数字字符，Meta 'ph' 字段强制要求)
 function hashPhone(val) {
     if (!val) return undefined;
     const clean = val.toString().replace(/[^\d]/g, '');
@@ -43,22 +43,23 @@ function hashPhone(val) {
     return crypto.createHash('sha256').update(clean).digest('hex');
 }
 
-// ✨ 升级版 Meta CAPI 回传函数
+// ✨ 升级版 Meta CAPI 回传函数：映射 client_phone
 async function sendToMetaCAPI(eventData) {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
     if (!pixelId || !token) return "Skipped: No Credentials";
 
-    // 核心拦截逻辑：id 和 phone 是必填项
-    if (!eventData.id || !eventData.phone) {
-        return "Failed: Missing ID or Phone";
+    // 核心拦截逻辑：id 和 client_phone 是必填项
+    // 如果您在触发 GO_META 时没有填 client_phone，将直接拦截并提示
+    if (!eventData.id || !eventData.client_phone) {
+        return "Failed: Missing ID or Client Phone";
     }
 
-    const reportFields = ['ip', 'ua', 'id', 'phone'];
+    const reportFields = ['ip', 'ua', 'id', 'client_phone'];
 
     const userData = {
-        external_id: [hashMeta(eventData.id)],    // 必填 ID
-        ph: [hashPhone(eventData.phone)],         // 必填 Phone
+        external_id: [hashMeta(eventData.id)],               // 必填 ID
+        ph: [hashPhone(eventData.client_phone)],             // 必填 客户电话，正确映射至 Meta 的 'ph' 字段
         client_ip_address: eventData.ip,
         client_user_agent: eventData.ua
     };
@@ -187,7 +188,6 @@ app.post('/api/log', async (req, res) => {
             gcl_au: logData.gcl_au || null
         };
 
-        // 新数据默认为 Pending 状态
         if (tableName !== 'wa_logs') insertData.meta_capi_status = "Pending";
 
         const { error: dbError } = await supabase.from(tableName).insert([insertData]);
@@ -200,22 +200,20 @@ app.post('/api/log', async (req, res) => {
 });
 
 
-// --- ✨ 新增：监听 Supabase 数据库修改的 Webhook 接口 ---
+// --- ✨ Webhook 接口：现在读取 client_phone 而不是业务员的 phone ---
 app.post('/api/webhook/supabase', async (req, res) => {
     try {
         const payload = req.body;
 
-        // 仅拦截 UPDATE 操作，并且只有当你在表格里把状态改成 'GO_META' 时才触发
-        if (payload.type === 'UPDATE' && payload.record && payload.record.meta_capi_status === 'gometa') {
+        if (payload.type === 'UPDATE' && payload.record && payload.record.meta_capi_status === 'GO_META') {
             const row = payload.record;
             const tableName = payload.table;
 
-            // 调用回传函数，获取数据库里的最新字段发送
             const status = await sendToMetaCAPI({
                 id: row.id,
-                phone: row.phone_number || row.phone, // 兼容不同表的列名
-                email: row.email,                     // 如果数据库没有该列，将是 undefined，自动忽略
-                name: row.name,                       // 同上
+                client_phone: row.client_phone,  // ✨ 读取用户手动填入的新增列（客户真实电话）
+                email: row.email,                // 选填
+                name: row.name,                  // 选填
                 url: row.referrer_url,
                 ip: row.ip,
                 ua: row.user_agent || row.ua,
@@ -225,7 +223,6 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 city: row.city
             });
 
-            // 成功或失败后，再次更新该行数据的状态，刷新回执
             if (supabase) {
                 await supabase.from(tableName).update({ meta_capi_status: status }).eq('id', row.id);
             }
