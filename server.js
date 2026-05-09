@@ -206,7 +206,7 @@ app.post('/api/webhook/supabase', async (req, res) => {
         const payload = req.body;
 
         // 仅拦截 UPDATE 操作，并且只有当你在表格里把状态改成 'GO_META' 时才触发
-        if (payload.type === 'UPDATE' && payload.record && payload.record.meta_capi_status === 'GO_META') {
+        if (payload.type === 'UPDATE' && payload.record && payload.record.meta_capi_status === 'gometa') {
             const row = payload.record;
             const tableName = payload.table;
 
