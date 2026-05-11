@@ -79,7 +79,7 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
             value: parseFloat(value), 
             currency: currency || 'USD' 
         };
-        reportFields.push('value');
+        reportFields.push('value', 'currency');
     }
 
     try {
