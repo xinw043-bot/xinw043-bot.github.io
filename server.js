@@ -40,6 +40,7 @@ function hashPhone(val) {
 }
 
 // ✨ 升级版回传函数：支持动态事件名和自定义金额数据
+// ✨ 调整：将 reportFields 作为函数返回值的一部分
 async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = null, currency = 'USD') {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
@@ -47,17 +48,23 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
 
     if (!eventData.id || !eventData.phone) return "Failed: Missing ID or Phone";
 
+    // 用于记录哪些字段被成功回传了
+    let reportFields = ['id', 'phone']; 
+
     const userData = {
-        external_id: [hashMeta(eventData.id)],
+        external_id:[hashMeta(eventData.id)],
         ph:[hashPhone(eventData.phone)],
         client_ip_address: eventData.ip,
         client_user_agent: eventData.ua
     };
+    reportFields.push('ip', 'ua');
 
-    if (eventData.fbc) userData.fbc = eventData.fbc;
-    if (eventData.fbp) userData.fbp = eventData.fbp;
-    if (eventData.email) userData.em = [hashMeta(eventData.email)];
-    if (eventData.name) userData.fn = [hashMeta(eventData.name)];
+    if (eventData.fbc) { userData.fbc = eventData.fbc; reportFields.push('fbc'); }
+    if (eventData.fbp) { userData.fbp = eventData.fbp; reportFields.push('fbp'); }
+    if (eventData.email) { userData.em = [hashMeta(eventData.email)]; reportFields.push('email'); }
+    if (eventData.name) { userData.fn = [hashMeta(eventData.name)]; reportFields.push('name'); }
+    if (eventData.country) { userData.ge =[hashMeta(eventData.country.substring(0,2))]; reportFields.push('country'); }
+    if (eventData.city) { userData.ct = [hashMeta(eventData.city)]; reportFields.push('city'); }
 
     const payloadData = {
         event_name: eventName,
@@ -67,11 +74,12 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         user_data: userData
     };
 
-    if (eventName === 'Purchase') {
+    if (eventName === 'Purchase' && value) {
         payloadData.custom_data = { 
             value: parseFloat(value), 
             currency: currency || 'USD' 
         };
+        reportFields.push('value');
     }
 
     try {
@@ -83,7 +91,9 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
 
         const resJson = await response.json();
         if (resJson.error) return `Meta Error: ${resJson.error.message}`;
-        return `Success | Sent: ${eventName}`;
+        
+        // ✨ 返回成功的事件名 + 字段列表
+        return `✅ ${eventName} | Sent:[${reportFields.join(', ')}]`;
     } catch (e) {
         return `Meta Fetch Failed: ${e.message}`;
     }
