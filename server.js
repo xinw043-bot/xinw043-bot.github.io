@@ -82,7 +82,7 @@ async function sendToMetaCAPI(eventData) {
     try {
         const payload = {
             data:[{
-                event_name: 'Lead',
+                event_name: 'qualified lead',
                 event_time: Math.floor(Date.now() / 1000),
                 action_source: 'website',
                 event_source_url: eventData.url,
