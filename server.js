@@ -120,7 +120,20 @@ app.post('/api/log', async (req, res) => {
         const ua = req.get('User-Agent') || '';
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         
-        if (!supabase) return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
+        if (!supabase) {
+            console.error("❌ 严重错误: Supabase 未初始化，请检查环境变量");
+            return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
+        }
+
+        // ⚠️ 修复点1：安全解析 City，防止 Vercel 特殊字符导致后端直接崩溃 (报500)
+        let safeCity = 'Unknown';
+        if (req.headers['x-vercel-ip-city']) {
+            try {
+                safeCity = decodeURIComponent(req.headers['x-vercel-ip-city']);
+            } catch (e) {
+                safeCity = req.headers['x-vercel-ip-city']; // 如果解析失败，直接使用原生字符串
+            }
+        }
 
         if (logData.type === 'form_submission') {
             const formData = {
@@ -139,13 +152,22 @@ app.post('/api/log', async (req, res) => {
                 wbraid: logData.wbraid || null,
                 gbraid: logData.gbraid || null,
                 country: req.headers['x-vercel-ip-country'] || 'Unknown', 
-                city: decodeURIComponent(req.headers['x-vercel-ip-city'] || 'Unknown') 
+                city: safeCity
             };
+
             const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
-            if (dbError) throw dbError;
+            
+            // ⚠️ 修复点2：将 Supabase 具体的拒绝原因打印到 Vercel 日志
+            if (dbError) {
+                console.error("❌ Supabase 写入失败 (form_submissions):", JSON.stringify(dbError));
+                throw dbError; // 将错误抛出给全局 catch
+            }
+            
             return res.status(200).json({ success: true, type: 'form' });
         }
 
+        // ======================= 下方是你原有的其他逻辑 =======================
+        
         let tableName = 'wa_logs'; 
         if (logData.is_telegram === true) {
             tableName = 'tg_logs';
@@ -173,7 +195,7 @@ app.post('/api/log', async (req, res) => {
             redirect_time: getBeijingTime(),
             ip: visitorIP,
             country: req.headers['x-vercel-ip-country'] || 'Unknown',
-            city: decodeURIComponent(req.headers['x-vercel-ip-city'] || 'Unknown'),
+            city: safeCity,  // 这里也同步应用了安全解码的城市
             user_agent: ua,
             language: logData.language || 'en',
             inquiry_id: logData.inquiryId || 'N/A',
@@ -187,15 +209,19 @@ app.post('/api/log', async (req, res) => {
             gcl_au: logData.gcl_au || null
         };
 
-        // 新数据默认为 Pending 状态
         if (tableName !== 'wa_logs') insertData.meta_capi_status = "Pending";
 
         const { error: dbError } = await supabase.from(tableName).insert([insertData]);
-        if (dbError) throw dbError;
+        if (dbError) {
+            console.error(`❌ Supabase 写入失败 (${tableName}):`, JSON.stringify(dbError));
+            throw dbError;
+        }
 
         res.status(200).json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        // ⚠️ 修复点3：确保全局异常信息能在 Vercel Logs 中显示
+        console.error("❌ 接口发生全局异常:", error.message || error);
+        res.status(500).json({ success: false, error: error.message || error });
     }
 });
 
