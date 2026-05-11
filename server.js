@@ -145,7 +145,7 @@ app.post('/api/log', async (req, res) => {
     }
 });
 
-// --- Webhook 接口 ---
+// --- 修改 Webhook 接口 ---
 app.post('/api/webhook/supabase', async (req, res) => {
     try {
         const payload = req.body;
@@ -153,16 +153,31 @@ app.post('/api/webhook/supabase', async (req, res) => {
             const row = payload.record;
             const tableName = payload.table;
             const statusVal = row.meta_capi_status;
+            
+            // ✨ 关键修复：显式构建 eventData 对象，确保字段名对得上
+            const eventData = {
+                id: row.id || row.inquiry_id,      // 确保取到 ID
+                phone: row.phone_number || row.phone, // 确保取到电话
+                email: row.email,
+                name: row.name,
+                url: row.referrer_url,
+                ip: row.ip,
+                ua: row.user_agent || row.ua,
+                fbc: row.fbc,
+                fbp: row.fbp,
+                country: row.country,
+                city: row.city
+            };
+
             let status = "";
 
             if (statusVal === 'gometa') {
-                status = await sendToMetaCAPI(row, 'qualified lead');
+                status = await sendToMetaCAPI(eventData, 'qualified lead');
             } else if (statusVal === 'purchase') {
-                // ✨ 新增：Value 校验
                 if (!row.value || parseFloat(row.value) <= 0) {
                     status = "Failed: Missing or Invalid Value";
                 } else {
-                    status = await sendToMetaCAPI(row, 'Purchase', row.value, row.currency);
+                    status = await sendToMetaCAPI(eventData, 'Purchase', row.value, row.currency);
                 }
             }
 
