@@ -155,6 +155,7 @@ app.post('/api/log', async (req, res) => {
 
 // --- Webhook ---
 app.post('/api/webhook/supabase', async (req, res) => {
+    console.log("Raw Webhook Payload:", JSON.stringify(req.body));
     try {
         const { type, record, table } = req.body;
         // 增加调试日志，查看接收到的数据
