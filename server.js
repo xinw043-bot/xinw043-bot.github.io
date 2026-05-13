@@ -157,19 +157,47 @@ app.post('/api/log', async (req, res) => {
 app.post('/api/webhook/supabase', async (req, res) => {
     try {
         const { type, record, table } = req.body;
+        // 增加调试日志，查看接收到的数据
+        console.log("Webhook Received:", type, "Status:", record.meta_capi_status);
+        
         if (type === 'UPDATE' && record) {
-            const eventData = { id: record.id, phone: record.phone_number || record.phone, email: record.email, name: record.name, url: record.referrer_url, ip: record.ip, ua: record.user_agent || record.ua, fbc: record.fbc, fbp: record.fbp, country: record.country, city: record.city, gclid: record.gclid, gcl_au: record.gcl_au, wbraid: record.wbraid, gbraid: record.gbraid };
+            const eventData = { id: record.id, phone: record.phone_number || record.phone, email: record.email, name: record.name, url: record.referrer_url, ip: record.ip, ua: record.user_agent || record.ua, fbc: record.fbc, fbp: record.fbp, country: record.country, city: record.city };
             let status = "";
             const statusVal = record.meta_capi_status;
 
-            if (statusVal === 'gometa') status = await sendToMetaCAPI(eventData, 'qualified lead');
-            else if (statusVal === 'purchase') status = await sendToMetaCAPI(eventData, 'Purchase', record.value, record.currency);
-            else if (statusVal === 'gogoogle') status = await sendToGoogleAds(record);
+            if (statusVal === 'gometa') {
+                status = await sendToMetaCAPI(eventData, 'qualified lead');
+            } else if (statusVal === 'purchase') {
+                if (!record.value || parseFloat(record.value) <= 0) status = "Failed: Invalid Value";
+                else status = await sendToMetaCAPI(eventData, 'Purchase', record.value, record.currency);
+            } else if (statusVal === 'gogoogle') {
+                // ✨ 调试重点：看看是否进入了这个分支
+                console.log("Executing Google Ads Sync for ID:", record.id);
+                if (!record.gclid) {
+                    status = "Failed: Missing GCLID";
+                } else {
+                    status = await sendToGoogleAds(record);
+                }
+            } else {
+                // 如果是其他状态，不处理
+                return res.status(200).json({ success: true, message: "No action needed" });
+            }
 
-            if (status && supabase) await supabase.from(table).update({ meta_capi_status: status }).eq('id', record.id);
+            // 数据库更新
+            if (status && supabase) {
+                const { error: updateError } = await supabase.from(table).update({ meta_capi_status: status }).eq('id', record.id);
+                if (updateError) {
+                    console.error("❌ Supabase 更新回执失败:", updateError);
+                } else {
+                    console.log("✅ 数据库回执已更新为:", status);
+                }
+            }
         }
         res.status(200).json({ success: true });
-    } catch (error) { res.status(500).json({ success: false }); }
+    } catch (error) { 
+        console.error("❌ Webhook Fatal Error:", error);
+        res.status(500).json({ success: false }); 
+    }
 });
 
 module.exports = app;
