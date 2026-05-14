@@ -246,7 +246,7 @@ app.post('/api/webhook/supabase', async (req, res) => {
             let updatePayload = {};
 
             if (metaStatusVal === 'gometa') {
-                const metaRes = await sendToMetaCAPI(eventData, 'qualified lead');
+                const metaRes = await sendToMetaCAPI(eventData, 'Lead');
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             } else if (metaStatusVal === 'purchase') {
                 const metaRes = await sendToMetaCAPI(eventData, 'Purchase', record.value, record.currency);
