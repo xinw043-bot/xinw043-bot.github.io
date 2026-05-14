@@ -1,18 +1,17 @@
 // ====================== 消除 MetadataLookupWarning ======================
-process.env.GCE_METADATA_HOST = '0.0.0.0';           // 让它快速失败
-process.env.METADATA_SERVER_DETECTION = 'none';      // 关键：禁用 metadata 探测
+process.env.GCE_METADATA_HOST = '0.0.0.0';
+process.env.METADATA_SERVER_DETECTION = 'none';
 
-// 抑制 Node.js 的特定 Warning
 const originalEmitWarning = process.emitWarning;
 process.emitWarning = (warning, type, ...args) => {
     if (warning && warning.includes && warning.includes('MetadatalookupWarning')) {
-        return; // 直接吞掉这个 warning
+        return;
     }
     return originalEmitWarning.call(process, warning, type, ...args);
 };
-
 console.log('⚙️ MetadataLookupWarning 已全局抑制');
 
+// ====================== 主代码 ======================
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
@@ -96,7 +95,7 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     }
 }
 
-// ==================== Google Ads（关键修复）===================
+// ==================== Google Ads（已优化回执格式）===================
 async function sendToGoogleAds(row) {
     const customerIdRaw = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim();
     const loginCustomerIdRaw = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim();
@@ -115,7 +114,7 @@ async function sendToGoogleAds(row) {
 
     try {
         if (!customerId || customerId.length !== 10) {
-            return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID: ${customerIdRaw}`;
+            return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID`;
         }
         if (!conversionActionId) {
             return `❌ Missing GOOGLE_CONVERSION_ACTION_ID`;
@@ -126,25 +125,24 @@ async function sendToGoogleAds(row) {
 
         const rawPhone = row.phone_number || row.phone;
         if (!row.id || !rawPhone || !row.value) {
-            return `❌ Missing required fields(id, phone, value)`;
+            return `❌ Missing required fields (id, phone, value)`;
         }
 
-        // 创建 Customer
         const customer = googleClient.Customer({
             customer_id: customerId,
             refresh_token: refreshToken,
             login_customer_id: loginCustomerId || undefined,
         });
 
-        const reportFields = ['id', 'phone', 'value'];
+        const sentFields = ['id', 'phone', 'value'];
 
-        const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
+        const userIdentifiers = [
+            { hashed_phone_number: hashPhone(rawPhone) }
+        ];
+
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
-            reportFields.push('email');
-        }
-        if (row.gcl_au) {
-           reportFields.push('gcl_au');
+            sentFields.push('email');
         }
 
         const dateObj = new Date(row.created_at || Date.now());
@@ -160,34 +158,46 @@ async function sendToGoogleAds(row) {
             user_identifiers: userIdentifiers
         };
 
-        if (row.gclid) conversion.gclid = row.gclid;
-        if (row.wbraid) conversion.wbraid = row.wbraid;
-        if (row.gbraid) conversion.gbraid = row.gbraid;
+        // 选传字段
+        if (row.gclid) {
+            conversion.gclid = row.gclid;
+            sentFields.push('gclid');
+        }
+        if (row.gcl_au) {
+            conversion.gcl_au = row.gcl_au;
+            sentFields.push('gcl_au');
+        }
+        if (row.wbraid) {
+            conversion.wbraid = row.wbraid;
+            sentFields.push('wbraid');
+        }
+        if (row.gbraid) {
+            conversion.gbraid = row.gbraid;
+            sentFields.push('gbraid');
+        }
 
-        // 【关键修复】使用正确的 Request 对象格式
-        const { services } = require('google-ads-api');   // 新增
-        const request = new services.UploadClickConversionsRequest({
-            customer_id: customerId,           // 必须显式传入
+        const response = await customer.conversionUploads.uploadClickConversions({
             conversions: [conversion],
             partial_failure: true
         });
 
-        const response = await customer.conversionUploads.uploadClickConversions(request);
-
         if (response.partial_failure_error) {
-            console.error("Google Partial Failure:", JSON.stringify(response.partial_failure_error));
-            return `❌ Google Partial Error: ${response.partial_failure_error.message || 'Unknown'}`;
+            console.error("Google Partial Failure:", response.partial_failure_error);
+            return `❌ Google Partial Error`;
         }
 
-        return `✅ Google Success | [${reportFields.join(', ')}]`;
+        const successMsg = `✅ Google Success | Sent: ${sentFields.join(', ')}`;
+        console.log(`✅ Google Ads Success for ID ${row.id} | ${successMsg}`);
+        
+        return successMsg;
 
     } catch (err) {
         console.error("❌ Google Ads Full Error:", err);
-        return `❌ Google Ads Error: ${err.message}`;
+        return `❌ Google Ads Error: ${err.message || 'Unknown'}`;
     }
 }
 
-// CORS + Routes（保持不变）
+// CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -196,7 +206,16 @@ app.use((req, res, next) => {
     next();
 });
 
-app.post('/api/log', async (req, res) => { /* ... 保持你原来的代码 */ });
+// Routes
+app.post('/api/log', async (req, res) => {
+    // 请保留你原来的 /api/log 完整逻辑，如果有的话
+    try {
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Log API Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 app.post('/api/webhook/supabase', async (req, res) => {
     console.log("Raw Webhook Payload:", JSON.stringify(req.body));
@@ -228,6 +247,7 @@ app.post('/api/webhook/supabase', async (req, res) => {
 
             let updatePayload = {};
 
+            // Meta 处理
             if (metaStatusVal === 'gometa') {
                 const metaRes = await sendToMetaCAPI(eventData, 'qualified lead');
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
@@ -236,6 +256,7 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             }
 
+            // Google 处理
             if (googleStatusVal === 'gogoogle') {
                 const googleRes = await sendToGoogleAds(record);
                 if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
