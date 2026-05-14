@@ -79,10 +79,11 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
 }
 
 // --- Google Ads API 回传 ---
+// --- Google Ads API 回传 (修复了官方函数名与格式) ---
 async function sendToGoogleAds(row) {
     try {
-        // 1. 必传项强制校验 (增加了 value 校验)
-        const missingFields =[];
+        // 1. 必传项强制校验
+        const missingFields = [];
         if (!row.id) missingFields.push('id');
         const rawPhone = row.phone_number || row.phone;
         if (!rawPhone) missingFields.push('phone');
@@ -96,9 +97,8 @@ async function sendToGoogleAds(row) {
             refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
         });
 
-        // 基础回传字段记录 (Value 和 Currency 已经是必传成功项)
-        let reportFields =['id', 'phone', 'gcl_au', 'value', 'currency'];
-        const userIdentifiers =[
+        let reportFields = ['id', 'phone', 'gcl_au', 'value', 'currency'];
+        const userIdentifiers = [
             { hashed_phone_number: hashPhone(rawPhone) }
         ];
         
@@ -107,17 +107,19 @@ async function sendToGoogleAds(row) {
             reportFields.push('email');
         }
 
+        // ✨ 修复 1：Google 要求时间必须是 "yyyy-mm-dd hh:mm:ss+|-hh:mm" 格式
+        const dateObj = new Date(row.created_at || new Date());
+        const formattedTime = dateObj.toISOString().replace('T', ' ').substring(0, 19) + '+00:00';
+
         const conversion = {
-            customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID,
-            gcl_au: row.gcl_au,
-            conversion_action: process.env.GOOGLE_CONVERSION_ACTION_ID,
-            conversion_date_time: new Date(row.created_at || new Date()).toISOString(),
+            // ✨ 修复 2：Google 要求转化操作 ID 必须是完整的资源路径
+            conversion_action: `customers/${process.env.GOOGLE_ADS_CUSTOMER_ID}/conversionActions/${process.env.GOOGLE_CONVERSION_ACTION_ID}`,
+            conversion_date_time: formattedTime,
             conversion_value: parseFloat(row.value),
             currency_code: row.currency || 'USD',
             user_identifiers: userIdentifiers
         };
 
-        // 补充地理位置映射
         if (row.country || row.city) {
             conversion.user_location = {
                 country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
@@ -126,14 +128,26 @@ async function sendToGoogleAds(row) {
             reportFields.push('country', 'city');
         }
 
-        // 补充点击 ID 追踪
         if (row.gclid) { conversion.gclid = row.gclid; reportFields.push('gclid'); }
         if (row.wbraid) { conversion.wbraid = row.wbraid; reportFields.push('wbraid'); }
         if (row.gbraid) { conversion.gbraid = row.gbraid; reportFields.push('gbraid'); }
 
-        await customer.uploadConversion(conversion);
+        // ✨ 修复 3：调用正确的官方 API 方法上传
+        const response = await customer.conversionUploads.uploadClickConversions({
+            conversions: [conversion],
+            partial_failure: true
+        });
+
+        if (response.partial_failure_error) {
+            console.error("❌ Google Ads 详细拒绝原因:", JSON.stringify(response.partial_failure_error));
+            return `❌ Google Ads 拒绝: ${response.partial_failure_error.message}`;
+        }
+
         return `✅ Success | Sent:[${reportFields.join(', ')}]`;
-    } catch (err) { return `❌ Google Ads: ${err.message}`; }
+    } catch (err) { 
+        console.error("❌ Google 代码执行报错:", err);
+        return `❌ Google Ads: ${err.message}`; 
+    }
 }
 
 app.use((req, res, next) => {
