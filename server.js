@@ -1,3 +1,18 @@
+// ====================== 消除 MetadataLookupWarning ======================
+process.env.GCE_METADATA_HOST = '0.0.0.0';           // 让它快速失败
+process.env.METADATA_SERVER_DETECTION = 'none';      // 关键：禁用 metadata 探测
+
+// 抑制 Node.js 的特定 Warning
+const originalEmitWarning = process.emitWarning;
+process.emitWarning = (warning, type, ...args) => {
+    if (warning && warning.includes && warning.includes('MetadatalookupWarning')) {
+        return; // 直接吞掉这个 warning
+    }
+    return originalEmitWarning.call(process, warning, type, ...args);
+};
+
+console.log('⚙️ MetadataLookupWarning 已全局抑制');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
