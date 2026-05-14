@@ -97,46 +97,19 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
 }
 
 // ==================== Google Ads（关键修复）===================
-// ==================== Google Ads（最终稳健版）===================
-let cachedCustomerId = null;
-let cachedLoginCustomerId = null;
-let cachedConversionActionId = null;
-let cachedRefreshToken = null;
-
-// 在模块加载时提前缓存一次
-function initGoogleEnvCache() {
-    cachedCustomerId = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim().replace(/-/g, '');
-    cachedLoginCustomerId = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim().replace(/-/g, '');
-    cachedConversionActionId = (process.env.GOOGLE_CONVERSION_ACTION_ID || '').trim();
-    cachedRefreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
-    
-    console.log('🔑 Google Env Cached:', {
-        customerId: cachedCustomerId ? `${cachedCustomerId.substring(0,4)}****` : 'MISSING',
-        hasLoginId: !!cachedLoginCustomerId,
-        hasConvId: !!cachedConversionActionId,
-        hasRefreshToken: !!cachedRefreshToken
-    });
-}
-initGoogleEnvCache();   // 模块初始化时执行
-
+// ==================== Google Ads（稳定版 + 清晰回执）===================
 async function sendToGoogleAds(row) {
-    // 每次执行都重新读取 +  fallback 到缓存
-    let customerId = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim().replace(/-/g, '');
-    let loginCustomerId = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim().replace(/-/g, '');
-    let conversionActionId = (process.env.GOOGLE_CONVERSION_ACTION_ID || '').trim();
-    let refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
+    const customerIdRaw = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim();
+    const loginCustomerIdRaw = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim();
+    const conversionActionId = (process.env.GOOGLE_CONVERSION_ACTION_ID || '').trim();
+    const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
 
-    // 如果当前请求读取失败，使用缓存
-    if (!customerId || customerId.length !== 10) {
-        customerId = cachedCustomerId;
-        console.warn('⚠️ 使用缓存的 customerId');
-    }
-    if (!conversionActionId) conversionActionId = cachedConversionActionId;
-    if (!refreshToken) refreshToken = cachedRefreshToken;
-    if (!loginCustomerId) loginCustomerId = cachedLoginCustomerId;
+    const customerId = customerIdRaw.replace(/-/g, '');
+    const loginCustomerId = loginCustomerIdRaw.replace(/-/g, '');
 
     console.log('🔍 [Google Ads Debug]', {
         customerId: customerId || 'EMPTY',
+        loginCustomerId: loginCustomerId || 'None',
         conversionActionId: conversionActionId || 'EMPTY',
         hasRefreshToken: !!refreshToken,
         rowId: row?.id
@@ -144,11 +117,14 @@ async function sendToGoogleAds(row) {
 
     try {
         if (!customerId || customerId.length !== 10) {
-            console.error('❌ GOOGLE_ADS_CUSTOMER_ID 仍然为空');
-            return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID`;
+            return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID: ${customerIdRaw}`;
         }
-        if (!conversionActionId) return `❌ Missing GOOGLE_CONVERSION_ACTION_ID`;
-        if (!refreshToken) return `❌ Missing GOOGLE_REFRESH_TOKEN`;
+        if (!conversionActionId) {
+            return `❌ Missing GOOGLE_CONVERSION_ACTION_ID`;
+        }
+        if (!refreshToken) {
+            return `❌ Missing GOOGLE_REFRESH_TOKEN`;
+        }
 
         const rawPhone = row.phone_number || row.phone;
         if (!row.id || !rawPhone || !row.value) {
@@ -184,10 +160,23 @@ async function sendToGoogleAds(row) {
         };
 
         // 选传字段
-        if (row.gclid) { conversion.gclid = row.gclid; sentFields.push('gclid'); }
-        if (row.gcl_au) { conversion.gcl_au = row.gcl_au; sentFields.push('gcl_au'); }
-        if (row.wbraid) { conversion.wbraid = row.wbraid; sentFields.push('wbraid'); }
-        if (row.gbraid) { conversion.gbraid = row.gbraid; sentFields.push('gbraid'); }
+        if (row.gclid) {
+            conversion.gclid = row.gclid;
+            sentFields.push('gclid');
+        }
+        if (row.gcl_au) {
+            conversion.gcl_au = row.gcl_au;
+            sentFields.push('gcl_au');
+        }
+        if (row.wbraid) {
+            conversion.wbraid = row.wbraid;
+            sentFields.push('wbraid');
+        }
+        if (row.gbraid) {
+            conversion.gbraid = row.gbraid;
+            sentFields.push('gbraid');
+        }
+        // 国家/城市（有就传）
         if (row.country || row.city) {
             conversion.user_location = {
                 country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
@@ -196,6 +185,7 @@ async function sendToGoogleAds(row) {
             sentFields.push('user_location');
         }
 
+        // 使用稳定调用方式（关键修复）
         const response = await customer.conversionUploads.uploadClickConversions({
             conversions: [conversion],
             partial_failure: true
@@ -208,10 +198,11 @@ async function sendToGoogleAds(row) {
 
         const successMsg = `✅ Google Success | Sent: ${sentFields.join(', ')}`;
         console.log(`✅ Google Success for ID ${row.id} → ${successMsg}`);
+        
         return successMsg;
 
     } catch (err) {
-        console.error("❌ Google Ads Full Error for ID", row?.id, ":", err);
+        console.error("❌ Google Ads Full Error:", err);
         return `❌ Google Ads Error: ${err.message || 'Unknown'}`;
     }
 }
