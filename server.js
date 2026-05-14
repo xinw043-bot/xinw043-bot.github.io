@@ -33,7 +33,7 @@ function getBeijingTime() {
 function hashMeta(val) { return val ? crypto.createHash('sha256').update(val.toString().trim().toLowerCase()).digest('hex') : undefined; }
 function hashPhone(val) { return val ? crypto.createHash('sha256').update(val.toString().replace(/\D/g, '')).digest('hex') : undefined; }
 
-// --- Meta CAPI ---
+// --- Meta CAPI 回传 ---
 async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = null, currency = 'USD') {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
@@ -78,24 +78,30 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     } catch (e) { return `Meta Failed: ${e.message}`; }
 }
 
-// --- Google Ads API ---
+// --- Google Ads API 回传 ---
 async function sendToGoogleAds(row) {
     try {
+        // 1. 必传项强制校验 (增加了 value 校验)
         const missingFields =[];
         if (!row.id) missingFields.push('id');
-        if (!row.phone) missingFields.push('phone');
+        const rawPhone = row.phone_number || row.phone;
+        if (!rawPhone) missingFields.push('phone');
         if (!row.gcl_au) missingFields.push('gcl_au');
-        if (missingFields.length > 0) return `❌ Google Ads: Missing required fields: ${missingFields.join(', ')}`;
+        if (!row.value || parseFloat(row.value) <= 0) missingFields.push('value');
+        
+        if (missingFields.length > 0) return `❌ Failed: Missing [${missingFields.join(', ')}]`;
 
         const customer = googleClient.Customer({
             customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID,
             refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
         });
 
-        let reportFields =['id', 'phone', 'gcl_au', 'conversion_action'];
+        // 基础回传字段记录 (Value 和 Currency 已经是必传成功项)
+        let reportFields =['id', 'phone', 'gcl_au', 'value', 'currency'];
         const userIdentifiers =[
-            { hashed_phone_number: hashPhone(row.phone) }
+            { hashed_phone_number: hashPhone(rawPhone) }
         ];
+        
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
             reportFields.push('email');
@@ -106,17 +112,27 @@ async function sendToGoogleAds(row) {
             gcl_au: row.gcl_au,
             conversion_action: process.env.GOOGLE_CONVERSION_ACTION_ID,
             conversion_date_time: new Date(row.created_at || new Date()).toISOString(),
-            conversion_value: parseFloat(row.value) || 0,
+            conversion_value: parseFloat(row.value),
             currency_code: row.currency || 'USD',
             user_identifiers: userIdentifiers
         };
 
+        // 补充地理位置映射
+        if (row.country || row.city) {
+            conversion.user_location = {
+                country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
+                city: row.city
+            };
+            reportFields.push('country', 'city');
+        }
+
+        // 补充点击 ID 追踪
         if (row.gclid) { conversion.gclid = row.gclid; reportFields.push('gclid'); }
         if (row.wbraid) { conversion.wbraid = row.wbraid; reportFields.push('wbraid'); }
         if (row.gbraid) { conversion.gbraid = row.gbraid; reportFields.push('gbraid'); }
 
         await customer.uploadConversion(conversion);
-        return `✅ Google Ads | Sent:[${reportFields.join(', ')}]`;
+        return `✅ Success | Sent:[${reportFields.join(', ')}]`;
     } catch (err) { return `❌ Google Ads: ${err.message}`; }
 }
 
@@ -156,47 +172,55 @@ app.post('/api/log', async (req, res) => {
 // --- Webhook ---
 app.post('/api/webhook/supabase', async (req, res) => {
     console.log("Raw Webhook Payload:", JSON.stringify(req.body));
+    
     try {
-        const { type, record, table } = req.body;
-        // 增加调试日志，查看接收到的数据
-        console.log("Webhook Received:", type, "Status:", record.meta_capi_status);
-        
-        if (type === 'UPDATE' && record) {
-            const eventData = { id: record.id, phone: record.phone_number || record.phone, email: record.email, name: record.name, url: record.referrer_url, ip: record.ip, ua: record.user_agent || record.ua, fbc: record.fbc, fbp: record.fbp, country: record.country, city: record.city };
-            let status = "";
-            const statusVal = record.meta_capi_status;
+        const payload = req.body;
+        const record = payload.record || payload.data;
+        const table = payload.table;
 
-            if (statusVal === 'gometa') {
-                status = await sendToMetaCAPI(eventData, 'qualified lead');
-            } else if (statusVal === 'purchase') {
-                if (!record.value || parseFloat(record.value) <= 0) status = "Failed: Invalid Value";
-                else status = await sendToMetaCAPI(eventData, 'Purchase', record.value, record.currency);
-            } else if (statusVal === 'gogoogle') {
-                // ✨ 调试重点：看看是否进入了这个分支
-                console.log("Executing Google Ads Sync for ID:", record.id);
-                if (!record.gclid) {
-                    status = "Failed: Missing GCLID";
-                } else {
-                    status = await sendToGoogleAds(record);
-                }
-            } else {
-                // 如果是其他状态，不处理
-                return res.status(200).json({ success: true, message: "No action needed" });
+        if (payload.type === 'UPDATE' && record) {
+            
+            // 提取 Meta 和 Google 的状态值
+            const metaStatusVal = record.meta_capi_status ? String(record.meta_capi_status).trim().toLowerCase() : "";
+            const googleStatusVal = record.google_data_api ? String(record.google_data_api).trim().toLowerCase() : "";
+            
+            console.log(`Processing ID: ${record.id} | Meta: "${metaStatusVal}" | Google: "${googleStatusVal}"`);
+
+            const eventData = { id: record.id, phone: record.phone_number || record.phone, email: record.email, name: record.name, url: record.referrer_url, ip: record.ip, ua: record.user_agent || record.ua, fbc: record.fbc, fbp: record.fbp, country: record.country, city: record.city };
+            
+            let updatePayload = {};
+
+            // ================= 1. 处理 Meta 逻辑 =================
+            if (metaStatusVal === 'gometa') {
+                const metaRes = await sendToMetaCAPI(eventData, 'qualified lead');
+                if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
+            } else if (metaStatusVal === 'purchase') {
+                let metaRes = "";
+                if (!record.value || parseFloat(record.value) <= 0) metaRes = "Failed: Missing or Invalid Value";
+                else metaRes = await sendToMetaCAPI(eventData, 'Purchase', record.value, record.currency);
+                
+                if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             }
 
-            // 数据库更新
-            if (status && supabase) {
-                const { error: updateError } = await supabase.from(table).update({ meta_capi_status: status }).eq('id', record.id);
-                if (updateError) {
-                    console.error("❌ Supabase 更新回执失败:", updateError);
-                } else {
-                    console.log("✅ 数据库回执已更新为:", status);
-                }
+            // ================= 2. 处理 Google Ads 逻辑 =================
+            if (googleStatusVal === 'gogoogle') {
+                const googleRes = await sendToGoogleAds(record);
+                // 只有状态改变了，才丢进 update 队列
+                if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
+            }
+
+            // ================= 3. 统一更新数据库 =================
+            if (Object.keys(updatePayload).length > 0 && supabase) {
+                console.log("-> 准备写入数据库:", updatePayload);
+                const { error } = await supabase.from(table || 'website_logs').update(updatePayload).eq('id', record.id);
+                if (error) console.error("❌ 数据库写入失败:", error);
+            } else {
+                console.log("-> 无匹配关键词或状态无需更新");
             }
         }
         res.status(200).json({ success: true });
     } catch (error) { 
-        console.error("❌ Webhook Fatal Error:", error);
+        console.error("❌ Webhook 崩溃报错:", error);
         res.status(500).json({ success: false }); 
     }
 });
