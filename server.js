@@ -79,6 +79,10 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
 }
 // --- Google Ads API 回传 (修复了官方函数名与格式) ---
 async function sendToGoogleAds(row) {
+    const subAccountId = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').replace(/-/g, '').trim();
+    const mccId = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').replace(/-/g, '').trim();
+    const convActionId = (process.env.GOOGLE_CONVERSION_ACTION_ID || '').trim();
+    const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
     try {
         // 1. 必传项强制校验
         const missingFields = [];
@@ -95,6 +99,7 @@ async function sendToGoogleAds(row) {
         const customer = googleClient.Customer({
             customer_id: cleanCustomerId,
             refresh_token: (process.env.GOOGLE_REFRESH_TOKEN || '').trim(),
+            login_customer_id: mccId,
         });
 
         let reportFields = ['id', 'phone', 'gcl_au', 'value', 'currency'];
