@@ -119,8 +119,6 @@ async function sendToGoogleAds(row) {
             customer_id: customerId,
             refresh_token: refreshToken,
             login_customer_id: loginCustomerId || undefined,
-            // 关键：禁止自动查询 GCP metadata
-            use_insecure_channel: false,
         });
 
         const reportFields = ['id', 'phone', 'gcl_au', 'value'];
