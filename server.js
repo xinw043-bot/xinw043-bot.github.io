@@ -14,11 +14,11 @@ let supabase = null;
 if (supabaseUrl && supabaseKey) {
     try { supabase = createClient(supabaseUrl, supabaseKey); } catch (e) { console.error("Supabase Init Error:", e); }
 }
-
+// ✨ 终极防抖：自动剔除所有环境变量可能带入的空格、回车和多余字符
 const googleClient = new GoogleAdsApi({
-  client_id: process.env.GOOGLE_CLIENT_ID,
-  client_secret: process.env.GOOGLE_CLIENT_SECRET,
-  developer_token: process.env.GOOGLE_DEVELOPER_TOKEN,
+  client_id: (process.env.GOOGLE_CLIENT_ID || '').trim(),
+  client_secret: (process.env.GOOGLE_CLIENT_SECRET || '').trim(),
+  developer_token: (process.env.GOOGLE_DEVELOPER_TOKEN || '').trim(),
 });
 
 function getBeijingTime() {
@@ -77,8 +77,6 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         return resJson.error ? `Meta Error: ${resJson.error.message}` : `✅ Meta:${eventName} | Sent:[${reportFields.join(', ')}]`;
     } catch (e) { return `Meta Failed: ${e.message}`; }
 }
-
-// --- Google Ads API 回传 ---
 // --- Google Ads API 回传 (修复了官方函数名与格式) ---
 async function sendToGoogleAds(row) {
     try {
@@ -91,10 +89,12 @@ async function sendToGoogleAds(row) {
         if (!row.value || parseFloat(row.value) <= 0) missingFields.push('value');
         
         if (missingFields.length > 0) return `❌ Failed: Missing [${missingFields.join(', ')}]`;
+        const cleanCustomerId = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').replace(/-/g, '').trim();
+        const cleanConversionActionId = (process.env.GOOGLE_CONVERSION_ACTION_ID || '').trim();
 
         const customer = googleClient.Customer({
-            customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID,
-            refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+            customer_id: cleanCustomerId,
+            refresh_token: (process.env.GOOGLE_REFRESH_TOKEN || '').trim(),
         });
 
         let reportFields = ['id', 'phone', 'gcl_au', 'value', 'currency'];
