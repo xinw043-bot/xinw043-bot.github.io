@@ -25,8 +25,6 @@ const googleClient = new GoogleAdsApi({
     client_id: (process.env.GOOGLE_CLIENT_ID || '').trim(),
     client_secret: (process.env.GOOGLE_CLIENT_SECRET || '').trim(),
     developer_token: (process.env.GOOGLE_DEVELOPER_TOKEN || '').trim(),
-    // 全局禁用 metadata lookup，消除警告
-    disable_gcp_metadata: true,
 });
 
 function hashMeta(val) {
@@ -121,6 +119,8 @@ async function sendToGoogleAds(row) {
             customer_id: customerId,
             refresh_token: refreshToken,
             login_customer_id: loginCustomerId || undefined,
+            // 关键：禁止自动查询 GCP metadata
+            use_insecure_channel: false,
         });
 
         const reportFields = ['id', 'phone', 'gcl_au', 'value'];
