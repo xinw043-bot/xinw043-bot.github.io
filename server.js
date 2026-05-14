@@ -142,7 +142,6 @@ async function sendToGoogleAds(row) {
         } else {
             sentFields.push('currency(USD)');
         }
-        sentFields.push(row.currency ? 'currency' : 'currency(USD)');
         const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
