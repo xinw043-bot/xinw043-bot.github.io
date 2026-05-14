@@ -136,15 +136,15 @@ async function sendToGoogleAds(row) {
             login_customer_id: loginCustomerId || undefined,
         });
 
-        const reportFields = ['id', 'phone', 'value'];
+        const sentFields = ['id', 'phone', 'value'];
 
         const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
-            reportFields.push('email');
+            sentFields.push('email');
         }
         if (row.gcl_au) {
-           reportFields.push('gcl_au');
+           sentFields.push('gcl_au');
         }
 
         const dateObj = new Date(row.created_at || Date.now());
@@ -186,7 +186,9 @@ async function sendToGoogleAds(row) {
             return `❌ Google Partial Error: ${response.partial_failure_error.message || 'Unknown'}`;
         }
 
-        return `✅ Google Success | [${reportFields.join(', ')}]`;
+        const successMsg = `✅ Google Success | Sent: ${sentFields.join(', ')}`;
+        console.log(`✅ Google Success for ID ${row.id} → ${successMsg}`);
+        return successMsg;
 
     } catch (err) {
         console.error("❌ Google Ads Full Error:", err);
