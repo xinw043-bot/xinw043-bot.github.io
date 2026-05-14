@@ -97,7 +97,6 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
 }
 
 // ==================== Google Ads（关键修复）===================
-// ==================== Google Ads（稳定版 + 清晰回执）===================
 async function sendToGoogleAds(row) {
     const customerIdRaw = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim();
     const loginCustomerIdRaw = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim();
@@ -108,11 +107,10 @@ async function sendToGoogleAds(row) {
     const loginCustomerId = loginCustomerIdRaw.replace(/-/g, '');
 
     console.log('🔍 [Google Ads Debug]', {
-        customerId: customerId || 'EMPTY',
+        customerId,
         loginCustomerId: loginCustomerId || 'None',
-        conversionActionId: conversionActionId || 'EMPTY',
-        hasRefreshToken: !!refreshToken,
-        rowId: row?.id
+        conversionActionId,
+        hasRefreshToken: !!refreshToken
     });
 
     try {
@@ -131,19 +129,22 @@ async function sendToGoogleAds(row) {
             return `❌ Missing required fields(id, phone, value)`;
         }
 
+        // 创建 Customer
         const customer = googleClient.Customer({
             customer_id: customerId,
             refresh_token: refreshToken,
             login_customer_id: loginCustomerId || undefined,
         });
 
-        const sentFields = ['id', 'phone', 'value'];
+        const reportFields = ['id', 'phone', 'value'];
 
         const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
-
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
-            sentFields.push('email');
+            reportFields.push('email');
+        }
+        if (row.gcl_au) {
+           reportFields.push('gcl_au');
         }
 
         const dateObj = new Date(row.created_at || Date.now());
@@ -159,51 +160,37 @@ async function sendToGoogleAds(row) {
             user_identifiers: userIdentifiers
         };
 
-        // 选传字段
-        if (row.gclid) {
-            conversion.gclid = row.gclid;
-            sentFields.push('gclid');
-        }
-        if (row.gcl_au) {
-            conversion.gcl_au = row.gcl_au;
-            sentFields.push('gcl_au');
-        }
-        if (row.wbraid) {
-            conversion.wbraid = row.wbraid;
-            sentFields.push('wbraid');
-        }
-        if (row.gbraid) {
-            conversion.gbraid = row.gbraid;
-            sentFields.push('gbraid');
-        }
-        // 国家/城市（有就传）
+        if (row.gclid) conversion.gclid = row.gclid;
+        if (row.wbraid) conversion.wbraid = row.wbraid;
+        if (row.gbraid) conversion.gbraid = row.gbraid;
         if (row.country || row.city) {
-            conversion.user_location = {
-                country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
-                city: row.city || undefined
-            };
-            sentFields.push('user_location');
-        }
+           conversion.user_location = {
+           country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
+           city: row.city || undefined
+    };
+    sentFields.push('user_location');
+}
 
-        // 使用稳定调用方式（关键修复）
-        const response = await customer.conversionUploads.uploadClickConversions({
+        // 【关键修复】使用正确的 Request 对象格式
+        const { services } = require('google-ads-api');   // 新增
+        const request = new services.UploadClickConversionsRequest({
+            customer_id: customerId,           // 必须显式传入
             conversions: [conversion],
             partial_failure: true
         });
 
+        const response = await customer.conversionUploads.uploadClickConversions(request);
+
         if (response.partial_failure_error) {
-            console.error("Google Partial Failure:", response.partial_failure_error);
-            return `❌ Google Partial Error`;
+            console.error("Google Partial Failure:", JSON.stringify(response.partial_failure_error));
+            return `❌ Google Partial Error: ${response.partial_failure_error.message || 'Unknown'}`;
         }
 
-        const successMsg = `✅ Google Success | Sent: ${sentFields.join(', ')}`;
-        console.log(`✅ Google Success for ID ${row.id} → ${successMsg}`);
-        
-        return successMsg;
+        return `✅ Google Success | [${reportFields.join(', ')}]`;
 
     } catch (err) {
         console.error("❌ Google Ads Full Error:", err);
-        return `❌ Google Ads Error: ${err.message || 'Unknown'}`;
+        return `❌ Google Ads Error: ${err.message}`;
     }
 }
 
