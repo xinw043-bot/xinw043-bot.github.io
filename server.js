@@ -125,8 +125,8 @@ async function sendToGoogleAds(row) {
         }
 
         const rawPhone = row.phone_number || row.phone;
-        if (!row.id || !rawPhone || !row.gcl_au || !row.value) {
-            return `❌ Missing required fields`;
+        if (!row.id || !rawPhone || !row.value) {
+            return `❌ Missing required fields(id, phone, value)`;
         }
 
         // 创建 Customer
