@@ -41,6 +41,15 @@ const googleClient = new GoogleAdsApi({
     developer_token: (process.env.GOOGLE_DEVELOPER_TOKEN || '').trim(),
 });
 
+// 全局环境变量检查（启动时打印）
+console.log('🔑 Google Env Check:', {
+    hasCustomerId: !!process.env.GOOGLE_ADS_CUSTOMER_ID,
+    hasLoginId: !!process.env.GOOGLE_LOGIN_CUSTOMER_ID,
+    hasConvId: !!process.env.GOOGLE_CONVERSION_ACTION_ID,
+    hasRefreshToken: !!process.env.GOOGLE_REFRESH_TOKEN,
+    customerIdLength: process.env.GOOGLE_ADS_CUSTOMER_ID ? process.env.GOOGLE_ADS_CUSTOMER_ID.trim().replace(/-/g, '').length : 0
+});
+
 function hashMeta(val) {
     return val ? crypto.createHash('sha256').update(val.toString().trim().toLowerCase()).digest('hex') : undefined;
 }
@@ -95,7 +104,7 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     }
 }
 
-// ==================== Google Ads（已优化回执格式）===================
+// ==================== Google Ads（加强版）===================
 async function sendToGoogleAds(row) {
     const customerIdRaw = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim();
     const loginCustomerIdRaw = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim();
@@ -106,14 +115,17 @@ async function sendToGoogleAds(row) {
     const loginCustomerId = loginCustomerIdRaw.replace(/-/g, '');
 
     console.log('🔍 [Google Ads Debug]', {
-        customerId,
+        customerId: customerId || 'EMPTY',
         loginCustomerId: loginCustomerId || 'None',
-        conversionActionId,
-        hasRefreshToken: !!refreshToken
+        conversionActionId: conversionActionId || 'EMPTY',
+        hasRefreshToken: !!refreshToken,
+        rowId: row?.id
     });
 
     try {
+        // 加强校验
         if (!customerId || customerId.length !== 10) {
+            console.error(`❌ Invalid or missing GOOGLE_ADS_CUSTOMER_ID: ${customerIdRaw}`);
             return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID`;
         }
         if (!conversionActionId) {
@@ -136,9 +148,7 @@ async function sendToGoogleAds(row) {
 
         const sentFields = ['id', 'phone', 'value'];
 
-        const userIdentifiers = [
-            { hashed_phone_number: hashPhone(rawPhone) }
-        ];
+        const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
 
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
@@ -158,23 +168,10 @@ async function sendToGoogleAds(row) {
             user_identifiers: userIdentifiers
         };
 
-        // 选传字段
-        if (row.gclid) {
-            conversion.gclid = row.gclid;
-            sentFields.push('gclid');
-        }
-        if (row.gcl_au) {
-            conversion.gcl_au = row.gcl_au;
-            sentFields.push('gcl_au');
-        }
-        if (row.wbraid) {
-            conversion.wbraid = row.wbraid;
-            sentFields.push('wbraid');
-        }
-        if (row.gbraid) {
-            conversion.gbraid = row.gbraid;
-            sentFields.push('gbraid');
-        }
+        if (row.gclid) { conversion.gclid = row.gclid; sentFields.push('gclid'); }
+        if (row.gcl_au) { conversion.gcl_au = row.gcl_au; sentFields.push('gcl_au'); }
+        if (row.wbraid) { conversion.wbraid = row.wbraid; sentFields.push('wbraid'); }
+        if (row.gbraid) { conversion.gbraid = row.gbraid; sentFields.push('gbraid'); }
 
         const response = await customer.conversionUploads.uploadClickConversions({
             conversions: [conversion],
@@ -187,17 +184,16 @@ async function sendToGoogleAds(row) {
         }
 
         const successMsg = `✅ Google Success | Sent: ${sentFields.join(', ')}`;
-        console.log(`✅ Google Ads Success for ID ${row.id} | ${successMsg}`);
-        
+        console.log(`✅ Google Ads Success for ID ${row.id} → ${successMsg}`);
         return successMsg;
 
     } catch (err) {
-        console.error("❌ Google Ads Full Error:", err);
+        console.error("❌ Google Ads Full Error for ID", row?.id, ":", err);
         return `❌ Google Ads Error: ${err.message || 'Unknown'}`;
     }
 }
 
-// CORS
+// CORS + Routes
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -206,14 +202,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// Routes
 app.post('/api/log', async (req, res) => {
-    // 请保留你原来的 /api/log 完整逻辑，如果有的话
     try {
         res.status(200).json({ success: true });
     } catch (error) {
         console.error("Log API Error:", error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false });
     }
 });
 
@@ -223,13 +217,15 @@ app.post('/api/webhook/supabase', async (req, res) => {
     try {
         const payload = req.body;
         const record = payload.record || payload.data;
-        const table = payload.table;
+        const table = payload.table || 'website_logs';
 
         if (payload.type === 'UPDATE' && record) {
-            const metaStatusVal = record.meta_capi_status ? String(record.meta_capi_status).trim().toLowerCase() : "";
-            const googleStatusVal = record.google_data_api ? String(record.google_data_api).trim().toLowerCase() : "";
+            const metaStatusVal = String(record.meta_capi_status || "").trim().toLowerCase();
+            const googleStatusVal = String(record.google_data_api || "").trim().toLowerCase();
 
             console.log(`Processing ID: ${record.id} | Meta: "${metaStatusVal}" | Google: "${googleStatusVal}"`);
+
+            let updatePayload = {};
 
             const eventData = {
                 id: record.id,
@@ -245,9 +241,6 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 city: record.city
             };
 
-            let updatePayload = {};
-
-            // Meta 处理
             if (metaStatusVal === 'gometa') {
                 const metaRes = await sendToMetaCAPI(eventData, 'qualified lead');
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
@@ -256,7 +249,6 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             }
 
-            // Google 处理
             if (googleStatusVal === 'gogoogle') {
                 const googleRes = await sendToGoogleAds(record);
                 if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
@@ -265,7 +257,7 @@ app.post('/api/webhook/supabase', async (req, res) => {
             if (Object.keys(updatePayload).length > 0 && supabase) {
                 console.log("-> 更新数据库:", updatePayload);
                 const { error } = await supabase
-                    .from(table || 'website_logs')
+                    .from(table)
                     .update(updatePayload)
                     .eq('id', record.id);
                 if (error) console.error("❌ DB Update Error:", error);
