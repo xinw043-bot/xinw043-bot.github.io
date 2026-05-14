@@ -57,6 +57,8 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     if (!pixelId || !token) return "Skipped: Meta Credentials";
     if (!eventData.id || !eventData.phone) return "Failed: Missing ID or Phone";
 
+    const sentFields = ['external_id', 'ph', 'ip', 'ua'];   // ← 新增
+
     const userData = {
         external_id: [hashMeta(eventData.id)],
         ph: [hashPhone(eventData.phone)],
@@ -64,12 +66,12 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         client_user_agent: eventData.ua
     };
 
-    if (eventData.fbc) userData.fbc = eventData.fbc;
-    if (eventData.fbp) userData.fbp = eventData.fbp;
-    if (eventData.email) userData.em = [hashMeta(eventData.email)];
-    if (eventData.name) userData.fn = [hashMeta(eventData.name)];
-    if (eventData.country) userData.ge = [hashMeta(eventData.country.substring(0, 2))];
-    if (eventData.city) userData.ct = [hashMeta(eventData.city)];
+    if (eventData.fbc) userData.fbc = eventData.fbc;sentFields.push('fbc');
+    if (eventData.fbp) userData.fbp = eventData.fbp;sentFields.push('fbp');
+    if (eventData.email) userData.em = [hashMeta(eventData.email)];sentFields.push('email');
+    if (eventData.name) userData.fn = [hashMeta(eventData.name)];sentFields.push('name');
+    if (eventData.country) userData.ge = [hashMeta(eventData.country.substring(0, 2))];sentFields.push('country');
+    if (eventData.city) userData.ct = [hashMeta(eventData.city)];sentFields.push('city');
 
     const payloadData = {
         event_name: eventName,
@@ -90,7 +92,13 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
             body: JSON.stringify({ data: [payloadData] })
         });
         const resJson = await response.json();
-        return resJson.error ? `Meta Error: ${resJson.error.message}` : `✅ Meta:${eventName}`;
+    if (resJson.error) {
+            return `Meta Error: ${resJson.error.message}`;
+        } else {
+            const successMsg = `✅ Meta:${eventName} | Sent: ${sentFields.join(', ')}`;
+            console.log(`✅ Meta Success → ${successMsg}`);
+            return successMsg;
+        }
     } catch (e) {
         return `Meta Failed: ${e.message}`;
     }
