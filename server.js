@@ -136,7 +136,7 @@ async function sendToGoogleAds(row) {
             login_customer_id: loginCustomerId || undefined,
         });
 
-        const reportFields = ['id', 'phone', 'gcl_au', 'value'];
+        const reportFields = ['id', 'phone', 'value'];
 
         const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
         if (row.email) {
