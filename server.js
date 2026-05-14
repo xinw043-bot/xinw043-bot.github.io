@@ -136,8 +136,13 @@ async function sendToGoogleAds(row) {
             login_customer_id: loginCustomerId || undefined,
         });
 
-        const sentFields = ['id', 'phone', 'value'];
-
+        const sentFields = ['id', 'phone', 'value', 'currency'];
+        if (row.currency) {
+            sentFields.push('currency');
+        } else {
+            sentFields.push('currency(USD)');
+        }
+        sentFields.push(row.currency ? 'currency' : 'currency(USD)');
         const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
