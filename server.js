@@ -143,6 +143,9 @@ async function sendToGoogleAds(row) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
             reportFields.push('email');
         }
+        if (row.gcl_au) {
+           reportFields.push('gcl_au');
+        }
 
         const dateObj = new Date(row.created_at || Date.now());
         const formattedTime = dateObj.toISOString().replace('T', ' ').substring(0, 19) + '+00:00';
