@@ -25,6 +25,8 @@ const googleClient = new GoogleAdsApi({
     client_id: (process.env.GOOGLE_CLIENT_ID || '').trim(),
     client_secret: (process.env.GOOGLE_CLIENT_SECRET || '').trim(),
     developer_token: (process.env.GOOGLE_DEVELOPER_TOKEN || '').trim(),
+    // 全局禁用 metadata lookup，消除警告
+    disable_gcp_metadata: true,
 });
 
 function hashMeta(val) {
