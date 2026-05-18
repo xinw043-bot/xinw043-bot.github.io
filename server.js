@@ -212,118 +212,54 @@ app.use((req, res, next) => {
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
 });
-
+//--api--
+// --- 核心写入接口 ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
         const ua = req.get('User-Agent') || '';
         const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
         
-        if (!supabase) {
-            console.error("❌ 严重错误: Supabase 未初始化，请检查环境变量");
-            return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
-        }
-
-        // ⚠️ 修复点1：安全解析 City，防止 Vercel 特殊字符导致后端直接崩溃 (报500)
         let safeCity = 'Unknown';
-        if (req.headers['x-vercel-ip-city']) {
-            try {
-                safeCity = decodeURIComponent(req.headers['x-vercel-ip-city']);
-            } catch (e) {
-                safeCity = req.headers['x-vercel-ip-city']; // 如果解析失败，直接使用原生字符串
-            }
-        }
+        try { if (req.headers['x-vercel-ip-city']) safeCity = decodeURIComponent(req.headers['x-vercel-ip-city']); } catch (e) { safeCity = req.headers['x-vercel-ip-city'] || 'Unknown'; }
 
         if (logData.type === 'form_submission') {
             const formData = {
-                name: logData.name,
-                email: logData.email,
-                company: logData.company,
-                phone: logData.phone,
-                page_url: logData.page_url,
-                referrer_url: logData.referrer_url, 
-                ip: visitorIP, 
-                ua: ua,        
-                fbc: logData.fbc || null,
-                fbp: logData.fbp || null,
-                gclid: logData.gclid || null,
-                gcl_au: logData.gcl_au || null,
-                wbraid: logData.wbraid || null,
-                gbraid: logData.gbraid || null,
-                country: req.headers['x-vercel-ip-country'] || 'Unknown', 
-                city: safeCity
+                name: logData.name, email: logData.email, company: logData.company, phone: logData.phone,
+                page_url: logData.page_url, referrer_url: logData.referrer_url, ip: visitorIP, ua: ua,        
+                fbc: logData.fbc || null, fbp: logData.fbp || null, gclid: logData.gclid || null,
+                gcl_au: logData.gcl_au || null, wbraid: logData.wbraid || null, gbraid: logData.gbraid || null,
+                country: req.headers['x-vercel-ip-country'] || 'Unknown', city: safeCity
             };
-
             const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
-            
-            // ⚠️ 修复点2：将 Supabase 具体的拒绝原因打印到 Vercel 日志
-            if (dbError) {
-                console.error("❌ Supabase 写入失败 (form_submissions):", JSON.stringify(dbError));
-                throw dbError; // 将错误抛出给全局 catch
-            }
-            
+            if (dbError) throw dbError;
             return res.status(200).json({ success: true, type: 'form' });
         }
 
-        // ======================= 下方是你原有的其他逻辑 =======================
-        
-        let tableName = 'wa_logs'; 
-        if (logData.is_telegram === true) {
-            tableName = 'tg_logs';
-        } else if (logData.is_website === true) {
-            tableName = 'website_logs';
-        }
+        let tableName = logData.is_telegram ? 'tg_logs' : (logData.is_website ? 'website_logs' : 'wa_logs');
+        if (ua.toLowerCase().includes('bot') || ua.toLowerCase().includes('crawl')) return res.status(200).json({ success: true, skipped: 'bot' });
 
-        if (ua.toLowerCase().includes('bot') || ua.toLowerCase().includes('crawl')) {
-            return res.status(200).json({ success: true, skipped: 'bot' });
-        }
-
-        let visitCount = 1;
-        let queryStr = `ip.eq.${visitorIP}`;
-        if (logData.fbp) queryStr += `,fbp.eq.${logData.fbp}`;
-        const { data: pastLogs } = await supabase.from(tableName).select('id').or(queryStr);
-        if (pastLogs && pastLogs.length > 0) visitCount = pastLogs.length + 1;
-
-        let pageUrl = logData.referrer_url || 'Direct';
-        if (logData.note && logData.note.includes(' | ')) pageUrl = logData.note.split(' | ').slice(2).join(' | ');
-        const actionTag = tableName === 'website_logs' ? 'WA_Main' : (tableName === 'tg_logs' ? 'TG_Main' : 'Intermediate');
-        const finalNote = `${actionTag} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
+        const { data: pastLogs } = await supabase.from(tableName).select('id').or(`ip.eq.${visitorIP},fbp.eq.${logData.fbp || 'null'}`);
+        const visitCount = (pastLogs ? pastLogs.length : 0) + 1;
+        const finalNote = `${tableName === 'website_logs' ? 'WA_Main' : (tableName === 'tg_logs' ? 'TG_Main' : 'Intermediate')} | ${visitCount > 1 ? `Old User (#${visitCount})` : 'New User'} | ${logData.referrer_url || 'Direct'}`;
 
         const insertData = {
-            phone_number: logData.phoneNumber,
-            redirect_time: getBeijingTime(),
-            ip: visitorIP,
-            country: req.headers['x-vercel-ip-country'] || 'Unknown',
-            city: safeCity,  // 这里也同步应用了安全解码的城市
-            user_agent: ua,
-            language: logData.language || 'en',
-            inquiry_id: logData.inquiryId || 'N/A',
-            note: finalNote,
-            referrer_url: logData.referrer_url || 'Direct',
-            fbc: logData.fbc || null,
-            fbp: logData.fbp || null,
-            gclid: logData.gclid || null,
-            wbraid: logData.wbraid || null,
-            gbraid: logData.gbraid || null,
-            gcl_au: logData.gcl_au || null
+            phone_number: logData.phoneNumber, redirect_time: getBeijingTime(), ip: visitorIP,
+            country: req.headers['x-vercel-ip-country'] || 'Unknown', city: safeCity, user_agent: ua,
+            language: logData.language || 'en', inquiry_id: logData.inquiryId || 'N/A', note: finalNote,
+            referrer_url: logData.referrer_url || 'Direct', fbc: logData.fbc || null, fbp: logData.fbp || null,
+            gclid: logData.gclid || null, wbraid: logData.wbraid || null, gbraid: logData.gbraid || null, gcl_au: logData.gcl_au || null
         };
-
         if (tableName !== 'wa_logs') insertData.meta_capi_status = "Pending";
 
         const { error: dbError } = await supabase.from(tableName).insert([insertData]);
-        if (dbError) {
-            console.error(`❌ Supabase 写入失败 (${tableName}):`, JSON.stringify(dbError));
-            throw dbError;
-        }
-
+        if (dbError) throw dbError;
         res.status(200).json({ success: true });
     } catch (error) {
-        // ⚠️ 修复点3：确保全局异常信息能在 Vercel Logs 中显示
-        console.error("❌ 接口发生全局异常:", error.message || error);
-        res.status(500).json({ success: false, error: error.message || error });
+        console.error("❌ 接口异常:", error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
-
 // --- Webhook ---
 app.post('/api/webhook/supabase', async (req, res) => {
     console.log("Raw Webhook Payload:", JSON.stringify(req.body));
