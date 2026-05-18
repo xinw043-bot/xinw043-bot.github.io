@@ -175,9 +175,10 @@ async function sendToGoogleAds(row) {
            conversion.user_location = {
            country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
            city: row.city || undefined
-        };
-        sentFields.push('user_location');
-    }
+    };
+    if (row.country) sentFields.push('country');
+    if (row.city) sentFields.push('city');
+    
 }
 
         // 【关键修复】使用正确的 Request 对象格式
