@@ -176,8 +176,7 @@ async function sendToGoogleAds(row) {
            country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
            city: row.city || undefined
         };
-        if (row.country) sentFields.push('country');
-        if (row.city) sentFields.push('city');
+        sentFields.push('user_location');
     }
 }
 
