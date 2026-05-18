@@ -66,12 +66,12 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         client_user_agent: eventData.ua
     };
 
-    if (eventData.fbc) userData.fbc = eventData.fbc;sentFields.push('fbc');
-    if (eventData.fbp) userData.fbp = eventData.fbp;sentFields.push('fbp');
-    if (eventData.email) userData.em = [hashMeta(eventData.email)];sentFields.push('email');
-    if (eventData.name) userData.fn = [hashMeta(eventData.name)];sentFields.push('name');
-    if (eventData.country) userData.ge = [hashMeta(eventData.country.substring(0, 2))];sentFields.push('country');
-    if (eventData.city) userData.ct = [hashMeta(eventData.city)];sentFields.push('city');
+    if (eventData.fbc) { userData.fbc = eventData.fbc; sentFields.push('fbc'); }
+    if (eventData.fbp) { userData.fbp = eventData.fbp; sentFields.push('fbp'); }
+    if (eventData.email) { userData.em = [hashMeta(eventData.email)]; sentFields.push('email'); }
+    if (eventData.name) { userData.fn = [hashMeta(eventData.name)]; sentFields.push('name'); }
+    if (eventData.country) { userData.ge = [hashMeta(eventData.country.substring(0, 2))]; sentFields.push('country'); }
+    if (eventData.city) { userData.ct = [hashMeta(eventData.city)]; sentFields.push('city'); }
 
     const payloadData = {
         event_name: eventName,
@@ -212,8 +212,7 @@ app.use((req, res, next) => {
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
 });
-//--api--
-// --- 核心写入接口 ---
+// --- api 核心写入接口 ---
 app.post('/api/log', async (req, res) => {
     try {
         const logData = req.body;
