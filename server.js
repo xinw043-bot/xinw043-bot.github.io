@@ -292,7 +292,6 @@ app.post('/api/log', async (req, res) => {
 
         const insertData = {
             phone_number: logData.phoneNumber,
-            redirect_time: getBeijingTime(),
             ip: visitorIP,
             country: req.headers['x-vercel-ip-country'] || 'Unknown',
             city: safeCity,  // 这里也同步应用了安全解码的城市
