@@ -213,8 +213,32 @@ app.use((req, res, next) => {
     next();
 });
 
-app.post('/api/log', async (req, res) => { /* ... 保持你原来的代码 */ });
+// app.post('/api/log', async (req, res) => { /* ... 保持你原来的代码 */ });
+// --- API ---
+app.post('/api/log', async (req, res) => {
+    try {
+        const logData = req.body;
+        const ua = req.get('User-Agent') || '';
+        const visitorIP = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.ip;
+        let safeCity = 'Unknown';
+        try { if (req.headers['x-vercel-ip-city']) safeCity = decodeURIComponent(req.headers['x-vercel-ip-city']); } catch (e) { safeCity = req.headers['x-vercel-ip-city'] || 'Unknown'; }
 
+        if (logData.type === 'form_submission') {
+            const formData = {
+                name: logData.name, email: logData.email, company: logData.company, phone: logData.phone,
+                page_url: logData.page_url, referrer_url: logData.referrer_url, ip: visitorIP, ua: ua,        
+                fbc: logData.fbc || null, fbp: logData.fbp || null, gclid: logData.gclid || null,
+                gcl_au: logData.gcl_au || null, wbraid: logData.wbraid || null, gbraid: logData.gbraid || null,
+                country: req.headers['x-vercel-ip-country'] || 'Unknown', city: safeCity
+            };
+            const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
+            if (dbError) throw dbError;
+            return res.status(200).json({ success: true, type: 'form' });
+        }
+        res.status(200).json({ success: true });
+    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+// --- Webhook ---
 app.post('/api/webhook/supabase', async (req, res) => {
     console.log("Raw Webhook Payload:", JSON.stringify(req.body));
 
