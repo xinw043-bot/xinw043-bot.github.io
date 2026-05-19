@@ -54,30 +54,29 @@ function hashPhone(val) {
 async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = null, currency = 'USD') {
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
+    
+    // 1. 基础校验 (所有事件必传 id 和 phone)
     if (!pixelId || !token) return "Skipped: Meta Credentials";
     if (!eventData.id || !eventData.phone) return "Failed: Missing ID or Phone";
 
-    // 1. 初始数组只保留确定必传的核心字段
+    // 2. 【新增】Purchase 专属强制校验
+    if (eventName === 'Purchase') {
+        if (!value || !currency) {
+            return "Failed: Missing Value or Currency for Purchase"; // 缺少金额或货币直接报错拦截
+        }
+    }
+
+    // 3. 初始回传字段 (修复了之前把 ip, ua 写死的 bug)
     const sentFields = ['external_id', 'ph'];   
 
-    // 2. 初始 userData 只包含核心字段
     const userData = {
         external_id: [hashMeta(eventData.id)],
         ph: [hashPhone(eventData.phone)]
     };
 
-    // 3. 动态判断并添加 IP
-    if (eventData.ip) { 
-        userData.client_ip_address = eventData.ip; 
-        sentFields.push('ip'); 
-    }
-    
-    // 4. 动态判断并添加 UA (User Agent)
-    if (eventData.ua) { 
-        userData.client_user_agent = eventData.ua; 
-        sentFields.push('ua'); 
-    }
-
+    // 4. 动态判断并添加用户参数
+    if (eventData.ip) { userData.client_ip_address = eventData.ip; sentFields.push('ip'); }
+    if (eventData.ua) { userData.client_user_agent = eventData.ua; sentFields.push('ua'); }
     if (eventData.fbc) { userData.fbc = eventData.fbc; sentFields.push('fbc'); }
     if (eventData.fbp) { userData.fbp = eventData.fbp; sentFields.push('fbp'); }
     if (eventData.email) { userData.em = [hashMeta(eventData.email)]; sentFields.push('email'); }
@@ -93,8 +92,17 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         user_data: userData
     };
 
-    if (eventName === 'Purchase' && value) {
-        payloadData.custom_data = { value: parseFloat(value), currency: currency || 'USD' };
+    // 5. 【新增】Purchase 添加金额数据，并写入回执
+    if (eventName === 'Purchase') {
+        // 构建 custom_data
+        payloadData.custom_data = { 
+            value: parseFloat(value), 
+            currency: currency.toUpperCase() 
+        };
+        // 将字段推入 sentFields，让回执中显示
+        // 这里我改成了更直观的格式，比如 value(100), currency(USD)，方便你看日志
+        sentFields.push(`value(${payloadData.custom_data.value})`);
+        sentFields.push(`currency(${payloadData.custom_data.currency})`);
     }
 
     try {
@@ -104,7 +112,8 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
             body: JSON.stringify({ data: [payloadData] })
         });
         const resJson = await response.json();
-    if (resJson.error) {
+        
+        if (resJson.error) {
             return `Meta Error: ${resJson.error.message}`;
         } else {
             const successMsg = `✅ Meta:${eventName} | Sent: ${sentFields.join(', ')}`;
