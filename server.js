@@ -57,14 +57,26 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     if (!pixelId || !token) return "Skipped: Meta Credentials";
     if (!eventData.id || !eventData.phone) return "Failed: Missing ID or Phone";
 
-    const sentFields = ['external_id', 'ph', 'ip', 'ua'];   // ← 新增
+    // 1. 初始数组只保留确定必传的核心字段
+    const sentFields = ['external_id', 'ph'];   
 
+    // 2. 初始 userData 只包含核心字段
     const userData = {
         external_id: [hashMeta(eventData.id)],
-        ph: [hashPhone(eventData.phone)],
-        client_ip_address: eventData.ip,
-        client_user_agent: eventData.ua
+        ph: [hashPhone(eventData.phone)]
     };
+
+    // 3. 动态判断并添加 IP
+    if (eventData.ip) { 
+        userData.client_ip_address = eventData.ip; 
+        sentFields.push('ip'); 
+    }
+    
+    // 4. 动态判断并添加 UA (User Agent)
+    if (eventData.ua) { 
+        userData.client_user_agent = eventData.ua; 
+        sentFields.push('ua'); 
+    }
 
     if (eventData.fbc) { userData.fbc = eventData.fbc; sentFields.push('fbc'); }
     if (eventData.fbp) { userData.fbp = eventData.fbp; sentFields.push('fbp'); }
