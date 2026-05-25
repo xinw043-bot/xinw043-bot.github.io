@@ -1,4 +1,4 @@
-// ====================== 消除 MetadataLookupWarning ======================
+// ====================== 消除 MetadataLookupWarning ====================== 
 process.env.GCE_METADATA_HOST = '0.0.0.0';           // 让它快速失败
 process.env.METADATA_SERVER_DETECTION = 'none';      // 关键：禁用 metadata 探测
 
