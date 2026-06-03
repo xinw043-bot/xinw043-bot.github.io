@@ -92,15 +92,12 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         user_data: userData
     };
 
-    // 5. 【新增】Purchase 添加金额数据，并写入回执
-    if (eventName === 'Purchase') {
-        // 构建 custom_data
+    // 5. 修改为：只要有 value 传入，无论是 Lead 还是 Purchase 都添加金额数据
+    if (value) { 
         payloadData.custom_data = { 
             value: parseFloat(value), 
-            currency: currency.toUpperCase() 
+            currency: (currency || 'USD').toUpperCase() 
         };
-        // 将字段推入 sentFields，让回执中显示
-        // 这里我改成了更直观的格式，比如 value(100), currency(USD)，方便你看日志
         sentFields.push(`value(${payloadData.custom_data.value})`);
         sentFields.push(`currency(${payloadData.custom_data.currency})`);
     }
@@ -375,7 +372,8 @@ app.post('/api/webhook/supabase', async (req, res) => {
             let updatePayload = {};
 
             if (metaStatusVal === 'gometa') {
-                const metaRes = await sendToMetaCAPI(eventData, 'Lead');
+                // 修改点：传入 record.value 和 record.currency
+                const metaRes = await sendToMetaCAPI(eventData, 'Lead', record.value, record.currency);
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             } else if (metaStatusVal === 'purchase') {
                 const metaRes = await sendToMetaCAPI(eventData, 'Purchase', record.value, record.currency);
