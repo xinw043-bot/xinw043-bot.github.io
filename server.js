@@ -382,10 +382,23 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             }
 
-            if (googleStatusVal === 'gogoogle') {
-                const googleRes = await sendToGoogleAds(record);
-                if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
-            }
+            // --- 修改后的 Google 逻辑触发区 ---
+if (googleStatusVal === 'gogoogle') {
+    // 逻辑：依然执行原有的 Google Ads API 回传
+    const googleRes = await sendToGoogleAds(record);
+    
+    // 【可选建议】既然是广告订单，通常也建议同步给 GA4 发一份，实现数据同步
+    await sendToGA4(record, 'purchase'); 
+    
+    if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
+
+} else if (googleStatusVal === 'goga4') {
+    // 逻辑：当你输入 goga4 时，仅触发 GA4 的全量回传
+    const ga4Res = await sendToGA4(record, 'purchase'); // 事件名可改为 lead 或 purchase
+    
+    // 将 GA4 的回传结果写回数据库的状态列，方便你查看是否成功
+    updatePayload.google_data_api = ga4Res; 
+}
 
             if (Object.keys(updatePayload).length > 0 && supabase) {
                 console.log("-> 更新数据库:", updatePayload);
@@ -409,7 +422,12 @@ async function sendToGA4(record, eventName = 'purchase') {
 
     if (!measurementId || !apiSecret || !record.ga_client_id) {
         return "Skipped GA4: Missing Credentials or ClientID";
+    if (response.status === 204 || response.status === 200) {
+        return `✅ GA4 Success | ${eventName}`; // 这个字符串会写进你的 google_data_api 列
+    } else {
+        return `❌ GA4 Failed`;
     }
+}
 
     const payload = {
         client_id: record.ga_client_id, // 关键：必须对应前端访客的 _ga cookie
