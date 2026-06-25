@@ -254,6 +254,7 @@ app.post('/api/log', async (req, res) => {
 
         if (logData.type === 'form_submission') {
             const formData = {
+                ga_client_id: logData.ga_client_id || null,
                 name: logData.name,
                 email: logData.email,
                 company: logData.company,
@@ -308,6 +309,7 @@ app.post('/api/log', async (req, res) => {
         const finalNote = `${actionTag} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
 
         const insertData = {
+            ga_client_id: logData.ga_client_id || null,
             phone_number: logData.phoneNumber,
             ip: visitorIP,
             country: req.headers['x-vercel-ip-country'] || 'Unknown',
@@ -400,6 +402,50 @@ app.post('/api/webhook/supabase', async (req, res) => {
         console.error("❌ Webhook Error:", error);
         res.status(500).json({ success: false });
     }
+    // ==================== GA4 Measurement Protocol ====================
+async function sendToGA4(record, eventName = 'purchase') {
+    const measurementId = process.env.GA4_MEASUREMENT_ID;
+    const apiSecret = process.env.GA4_API_SECRET;
+
+    if (!measurementId || !apiSecret || !record.ga_client_id) {
+        return "Skipped GA4: Missing Credentials or ClientID";
+    }
+
+    const payload = {
+        client_id: record.ga_client_id, // 关键：必须对应前端访客的 _ga cookie
+        events: [{
+            name: eventName,
+            params: {
+                transaction_id: record.inquiry_id || `ID_${record.id}`,
+                value: parseFloat(record.value || 0),
+                currency: (record.currency || 'USD').toUpperCase(),
+                engagement_time_msec: "100",
+                source: record.referrer_url || 'Direct',
+                content_type: record.note ? record.note.split(' | ')[0] : 'Inquiry'
+            }
+        }]
+    };
+
+    try {
+        const url = `https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.status === 204 || response.status === 200) {
+            console.log(`✅ GA4 Success | Event: ${eventName} | ID: ${record.id}`);
+            return `✅ GA4:${eventName} Sent`;
+        } else {
+            const errText = await response.text();
+            return `GA4 Error: ${response.status} ${errText}`;
+        }
+    } catch (e) {
+        return `GA4 Failed: ${e.message}`;
+    }
+}
 });
+
+
 
 module.exports = app;
