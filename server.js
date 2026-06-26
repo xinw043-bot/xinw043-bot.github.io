@@ -215,7 +215,7 @@ async function sendToGA4(record, eventName = 'purchase') {
     const payload = {
         client_id: record.ga_client_id, // 必须对应前端访客的 _ga cookie
         events: [{
-            name: eventName,
+            name: 'purchase',
             params: {
                 transaction_id: record.inquiry_id || `ID_${record.id}`,
                 value: parseFloat(record.value || 0),
