@@ -17,7 +17,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
-const { GoogleAdsApi } = require('google-ads-api');
+const { GoogleAdsApi, services } = require('google-ads-api'); // 修复点：提前解构 services
 
 const app = express();
 app.use(bodyParser.json());
@@ -55,26 +55,21 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     const pixelId = process.env.META_PIXEL_ID;
     const token = process.env.META_ACCESS_TOKEN;
     
-    // 1. 基础校验 (所有事件必传 id 和 phone)
     if (!pixelId || !token) return "Skipped: Meta Credentials";
     if (!eventData.id || !eventData.phone) return "Failed: Missing ID or Phone";
 
-    // 2. 【新增】Purchase 专属强制校验
     if (eventName === 'Purchase') {
         if (!value || !currency) {
-            return "Failed: Missing Value or Currency for Purchase"; // 缺少金额或货币直接报错拦截
+            return "Failed: Missing Value or Currency for Purchase"; 
         }
     }
 
-    // 3. 初始回传字段 (修复了之前把 ip, ua 写死的 bug)
     const sentFields = ['external_id', 'ph'];   
-
     const userData = {
         external_id: [hashMeta(eventData.id)],
         ph: [hashPhone(eventData.phone)]
     };
 
-    // 4. 动态判断并添加用户参数
     if (eventData.ip) { userData.client_ip_address = eventData.ip; sentFields.push('ip'); }
     if (eventData.ua) { userData.client_user_agent = eventData.ua; sentFields.push('ua'); }
     if (eventData.fbc) { userData.fbc = eventData.fbc; sentFields.push('fbc'); }
@@ -92,7 +87,6 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
         user_data: userData
     };
 
-    // 5. 修改为：只要有 value 传入，无论是 Lead 还是 Purchase 都添加金额数据
     if (value) { 
         payloadData.custom_data = { 
             value: parseFloat(value), 
@@ -122,7 +116,7 @@ async function sendToMetaCAPI(eventData, eventName = 'qualified lead', value = n
     }
 }
 
-// ==================== Google Ads（关键修复）===================
+// ==================== Google Ads API ====================
 async function sendToGoogleAds(row) {
     const customerIdRaw = (process.env.GOOGLE_ADS_CUSTOMER_ID || '').trim();
     const loginCustomerIdRaw = (process.env.GOOGLE_LOGIN_CUSTOMER_ID || '').trim();
@@ -132,30 +126,20 @@ async function sendToGoogleAds(row) {
     const customerId = customerIdRaw.replace(/-/g, '');
     const loginCustomerId = loginCustomerIdRaw.replace(/-/g, '');
 
-    console.log('🔍 [Google Ads Debug]', {
-        customerId,
-        loginCustomerId: loginCustomerId || 'None',
-        conversionActionId,
-        hasRefreshToken: !!refreshToken
-    });
+    // 🚨 修复点：拦截非广告流量（解决无效报错的核心）
+    if (!row.gclid && !row.wbraid && !row.gbraid) {
+        console.log(`⚠️ Skipped Google Ads for ID ${row.id}: No Ad Click ID (gclid/wbraid/gbraid)`);
+        return `⚠️ Skipped: No GCLID`; 
+    }
 
     try {
-        if (!customerId || customerId.length !== 10) {
-            return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID: ${customerIdRaw}`;
-        }
-        if (!conversionActionId) {
-            return `❌ Missing GOOGLE_CONVERSION_ACTION_ID`;
-        }
-        if (!refreshToken) {
-            return `❌ Missing GOOGLE_REFRESH_TOKEN`;
-        }
+        if (!customerId || customerId.length !== 10) return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID`;
+        if (!conversionActionId) return `❌ Missing GOOGLE_CONVERSION_ACTION_ID`;
+        if (!refreshToken) return `❌ Missing GOOGLE_REFRESH_TOKEN`;
 
         const rawPhone = row.phone_number || row.phone;
-        if (!row.id || !rawPhone || !row.value) {
-            return `❌ Missing required fields(id, phone, value)`;
-        }
+        if (!row.id || !rawPhone || !row.value) return `❌ Missing required fields(id, phone, value)`;
 
-        // 创建 Customer
         const customer = googleClient.Customer({
             customer_id: customerId,
             refresh_token: refreshToken,
@@ -169,9 +153,7 @@ async function sendToGoogleAds(row) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
             sentFields.push('email');
         }
-        if (row.gcl_au) {
-           sentFields.push('gcl_au');
-        }
+        if (row.gcl_au) sentFields.push('gcl_au');
 
         const dateObj = new Date(row.created_at || Date.now());
         const formattedTime = dateObj.toISOString().replace('T', ' ').substring(0, 19) + '+00:00';
@@ -191,16 +173,14 @@ async function sendToGoogleAds(row) {
         if (row.gbraid) conversion.gbraid = row.gbraid;
         if (row.country || row.city) {
            conversion.user_location = {
-           country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
-           city: row.city || undefined
-    };
-    sentFields.push('user_location');
-}
+               country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
+               city: row.city || undefined
+           };
+           sentFields.push('user_location');
+        }
 
-        // 【关键修复】使用正确的 Request 对象格式
-        const { services } = require('google-ads-api');   // 新增
         const request = new services.UploadClickConversionsRequest({
-            customer_id: customerId,           // 必须显式传入
+            customer_id: customerId,           
             conversions: [conversion],
             partial_failure: true
         });
@@ -222,7 +202,51 @@ async function sendToGoogleAds(row) {
     }
 }
 
-// CORS + Routes（保持不变）
+// ==================== GA4 Measurement Protocol ====================
+// 🚨 修复点：提取到全局作用域，修复了之前的大括号嵌套语法错误
+async function sendToGA4(record, eventName = 'purchase') {
+    const measurementId = process.env.GA4_MEASUREMENT_ID;
+    const apiSecret = process.env.GA4_API_SECRET;
+
+    if (!measurementId || !apiSecret || !record.ga_client_id) {
+        return "⚠️ Skipped GA4: Missing Credentials or ClientID";
+    }
+
+    const payload = {
+        client_id: record.ga_client_id, // 必须对应前端访客的 _ga cookie
+        events: [{
+            name: eventName,
+            params: {
+                transaction_id: record.inquiry_id || `ID_${record.id}`,
+                value: parseFloat(record.value || 0),
+                currency: (record.currency || 'USD').toUpperCase(),
+                engagement_time_msec: "100",
+                source: record.referrer_url || 'Direct',
+                content_type: record.note ? record.note.split(' | ')[0] : 'Inquiry'
+            }
+        }]
+    };
+
+    try {
+        const url = `https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.status === 204 || response.status === 200) {
+            console.log(`✅ GA4 Success | Event: ${eventName} | ID: ${record.id}`);
+            return `✅ GA4:${eventName} Success`;
+        } else {
+            const errText = await response.text();
+            return `❌ GA4 Error: ${response.status} ${errText}`;
+        }
+    } catch (e) {
+        return `❌ GA4 Failed: ${e.message}`;
+    }
+}
+
+// ==================== CORS + Routes ====================
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -230,6 +254,7 @@ app.use((req, res, next) => {
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
 });
+
 // --- api 核心写入接口 ---
 app.post('/api/log', async (req, res) => {
     try {
@@ -242,19 +267,18 @@ app.post('/api/log', async (req, res) => {
             return res.status(500).json({ success: false, error: 'DB_CONNECTION_ERROR' });
         }
 
-        // ⚠️ 修复点1：安全解析 City，防止 Vercel 特殊字符导致后端直接崩溃 (报500)
         let safeCity = 'Unknown';
         if (req.headers['x-vercel-ip-city']) {
             try {
                 safeCity = decodeURIComponent(req.headers['x-vercel-ip-city']);
             } catch (e) {
-                safeCity = req.headers['x-vercel-ip-city']; // 如果解析失败，直接使用原生字符串
+                safeCity = req.headers['x-vercel-ip-city']; 
             }
         }
 
         if (logData.type === 'form_submission') {
             const formData = {
-                ga_client_id: logData.ga_client_id || null,
+                ga_client_id: logData.ga_client_id || null, // 写入 GA Client ID
                 name: logData.name,
                 email: logData.email,
                 company: logData.company,
@@ -274,17 +298,9 @@ app.post('/api/log', async (req, res) => {
             };
 
             const { error: dbError } = await supabase.from('form_submissions').insert([formData]);
-            
-            // ⚠️ 修复点2：将 Supabase 具体的拒绝原因打印到 Vercel 日志
-            if (dbError) {
-                console.error("❌ Supabase 写入失败 (form_submissions):", JSON.stringify(dbError));
-                throw dbError; // 将错误抛出给全局 catch
-            }
-            
+            if (dbError) throw dbError;
             return res.status(200).json({ success: true, type: 'form' });
         }
-
-        // ======================= 下方是你原有的其他逻辑 =======================
         
         let tableName = 'wa_logs'; 
         if (logData.is_telegram === true) {
@@ -309,11 +325,11 @@ app.post('/api/log', async (req, res) => {
         const finalNote = `${actionTag} | ${visitCount > 1 ? `Old User (Click #${visitCount})` : 'New User'} | ${pageUrl}`;
 
         const insertData = {
-            ga_client_id: logData.ga_client_id || null,
+            ga_client_id: logData.ga_client_id || null, // 写入 GA Client ID
             phone_number: logData.phoneNumber,
             ip: visitorIP,
             country: req.headers['x-vercel-ip-country'] || 'Unknown',
-            city: safeCity,  // 这里也同步应用了安全解码的城市
+            city: safeCity,  
             user_agent: ua,
             language: logData.language || 'en',
             inquiry_id: logData.inquiryId || 'N/A',
@@ -330,18 +346,15 @@ app.post('/api/log', async (req, res) => {
         if (tableName !== 'wa_logs') insertData.meta_capi_status = "Pending";
 
         const { error: dbError } = await supabase.from(tableName).insert([insertData]);
-        if (dbError) {
-            console.error(`❌ Supabase 写入失败 (${tableName}):`, JSON.stringify(dbError));
-            throw dbError;
-        }
+        if (dbError) throw dbError;
 
         res.status(200).json({ success: true });
     } catch (error) {
-        // ⚠️ 修复点3：确保全局异常信息能在 Vercel Logs 中显示
         console.error("❌ 接口发生全局异常:", error.message || error);
         res.status(500).json({ success: false, error: error.message || error });
     }
 });
+
 // --- Webhook ---
 app.post('/api/webhook/supabase', async (req, res) => {
     console.log("Raw Webhook Payload:", JSON.stringify(req.body));
@@ -373,8 +386,8 @@ app.post('/api/webhook/supabase', async (req, res) => {
 
             let updatePayload = {};
 
+            // Meta 逻辑
             if (metaStatusVal === 'gometa') {
-                // 修改点：传入 record.value 和 record.currency
                 const metaRes = await sendToMetaCAPI(eventData, 'Lead', record.value, record.currency);
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             } else if (metaStatusVal === 'purchase') {
@@ -382,24 +395,23 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 if (metaRes !== record.meta_capi_status) updatePayload.meta_capi_status = metaRes;
             }
 
-            // --- 修改后的 Google 逻辑触发区 ---
-if (googleStatusVal === 'gogoogle') {
-    // 逻辑：依然执行原有的 Google Ads API 回传
-    const googleRes = await sendToGoogleAds(record);
-    
-    // 【可选建议】既然是广告订单，通常也建议同步给 GA4 发一份，实现数据同步
-    await sendToGA4(record, 'purchase'); 
-    
-    if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
+            // Google & GA4 逻辑
+            if (googleStatusVal === 'gogoogle') {
+                // 1. Google Ads API 离线转化 (已加无 GCLID 拦截)
+                const googleRes = await sendToGoogleAds(record);
+                
+                // 2. 同步发送给 GA4
+                await sendToGA4(record, 'purchase'); 
+                
+                if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
 
-} else if (googleStatusVal === 'goga4') {
-    // 逻辑：当你输入 goga4 时，仅触发 GA4 的全量回传
-    const ga4Res = await sendToGA4(record, 'purchase'); // 事件名可改为 lead 或 purchase
-    
-    // 将 GA4 的回传结果写回数据库的状态列，方便你查看是否成功
-    updatePayload.google_data_api = ga4Res; 
-}
+            } else if (googleStatusVal === 'goga4') {
+                // 仅触发 GA4，适合自然流量
+                const ga4Res = await sendToGA4(record, 'purchase'); 
+                updatePayload.google_data_api = ga4Res; 
+            }
 
+            // 更新数据库
             if (Object.keys(updatePayload).length > 0 && supabase) {
                 console.log("-> 更新数据库:", updatePayload);
                 const { error } = await supabase
@@ -410,60 +422,11 @@ if (googleStatusVal === 'gogoogle') {
             }
         }
 
-        res.status(200).json({ success: true });
+        res.status(200).json({ success: true }); // 修复点：正确的结束请求
     } catch (error) {
         console.error("❌ Webhook Error:", error);
         res.status(500).json({ success: false });
     }
-    // ==================== GA4 Measurement Protocol ====================
-async function sendToGA4(record, eventName = 'purchase') {
-    const measurementId = process.env.GA4_MEASUREMENT_ID;
-    const apiSecret = process.env.GA4_API_SECRET;
-
-    if (!measurementId || !apiSecret || !record.ga_client_id) {
-        return "Skipped GA4: Missing Credentials or ClientID";
-    if (response.status === 204 || response.status === 200) {
-        return `✅ GA4 Success | ${eventName}`; // 这个字符串会写进你的 google_data_api 列
-    } else {
-        return `❌ GA4 Failed`;
-    }
-}
-
-    const payload = {
-        client_id: record.ga_client_id, // 关键：必须对应前端访客的 _ga cookie
-        events: [{
-            name: eventName,
-            params: {
-                transaction_id: record.inquiry_id || `ID_${record.id}`,
-                value: parseFloat(record.value || 0),
-                currency: (record.currency || 'USD').toUpperCase(),
-                engagement_time_msec: "100",
-                source: record.referrer_url || 'Direct',
-                content_type: record.note ? record.note.split(' | ')[0] : 'Inquiry'
-            }
-        }]
-    };
-
-    try {
-        const url = `https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        
-        if (response.status === 204 || response.status === 200) {
-            console.log(`✅ GA4 Success | Event: ${eventName} | ID: ${record.id}`);
-            return `✅ GA4:${eventName} Sent`;
-        } else {
-            const errText = await response.text();
-            return `GA4 Error: ${response.status} ${errText}`;
-        }
-    } catch (e) {
-        return `GA4 Failed: ${e.message}`;
-    }
-}
 });
-
-
 
 module.exports = app;
