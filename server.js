@@ -126,11 +126,8 @@ async function sendToGoogleAds(row) {
     const customerId = customerIdRaw.replace(/-/g, '');
     const loginCustomerId = loginCustomerIdRaw.replace(/-/g, '');
 
-    // 🚨 修复点：拦截非广告流量（解决无效报错的核心）
-    if (!row.gclid && !row.wbraid && !row.gbraid) {
-        console.log(`⚠️ Skipped Google Ads for ID ${row.id}: No Ad Click ID (gclid/wbraid/gbraid)`);
-        return `⚠️ Skipped: No GCLID`; 
-    }
+    // 💡 逻辑变更：删除了之前的 "if (!row.gclid...) return" 拦截器
+    // 即使没有 GCLID，我们也允许进入发送流程，依靠加密手机号进行匹配
 
     try {
         if (!customerId || customerId.length !== 10) return `❌ Invalid GOOGLE_ADS_CUSTOMER_ID`;
@@ -148,6 +145,8 @@ async function sendToGoogleAds(row) {
 
         const sentFields = ['id', 'phone', 'value'];
         sentFields.push(row.currency ? 'currency' : 'currency(USD)');
+        
+        // 关键：即使用户没有点广告，这部分加密信息也会发给谷歌进行“增强型”匹配
         const userIdentifiers = [{ hashed_phone_number: hashPhone(rawPhone) }];
         if (row.email) {
             userIdentifiers.push({ hashed_email: hashMeta(row.email) });
@@ -168,9 +167,11 @@ async function sendToGoogleAds(row) {
             user_identifiers: userIdentifiers
         };
 
-        if (row.gclid) conversion.gclid = row.gclid;
-        if (row.wbraid) conversion.wbraid = row.wbraid;
-        if (row.gbraid) conversion.gbraid = row.gbraid;
+        // 有哪个 ID 就传哪个，都没有就不传这些字段
+        if (row.gclid) { conversion.gclid = row.gclid; sentFields.push('gclid'); }
+        if (row.wbraid) { conversion.wbraid = row.wbraid; sentFields.push('wbraid'); }
+        if (row.gbraid) { conversion.gbraid = row.gbraid; sentFields.push('gbraid'); }
+
         if (row.country || row.city) {
            conversion.user_location = {
                country_code: row.country ? row.country.substring(0, 2).toUpperCase() : undefined,
@@ -187,12 +188,13 @@ async function sendToGoogleAds(row) {
 
         const response = await customer.conversionUploads.uploadClickConversions(request);
 
+        // 这里的报错处理会告诉你，如果没有 GCLID 且手机号也没匹配上，谷歌会报什么错
         if (response.partial_failure_error) {
-            console.error("Google Partial Failure:", JSON.stringify(response.partial_failure_error));
-            return `❌ Google Partial Error: ${response.partial_failure_error.message || 'Unknown'}`;
+            console.error("Google Partial Error:", JSON.stringify(response.partial_failure_error));
+            return `❌ Google Error: ${response.partial_failure_error.message}`;
         }
 
-        const successMsg = `✅ Google Success | Sent: ${sentFields.join(', ')}`;
+        const successMsg = `✅ Google Ads | Sent: ${sentFields.join(', ')}`;
         console.log(`✅ Google Success for ID ${row.id} → ${successMsg}`);
         return successMsg;
 
