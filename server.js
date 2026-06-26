@@ -410,9 +410,6 @@ app.post('/api/webhook/supabase', async (req, res) => {
                 // 1. Google Ads API 离线转化 (已加无 GCLID 拦截)
                 const googleRes = await sendToGoogleAds(record);
                 
-                // 2. 同步发送给 GA4
-                await sendToGA4(record, 'purchase'); 
-                
                 if (googleRes !== record.google_data_api) updatePayload.google_data_api = googleRes;
 
             } else if (googleStatusVal === 'goga4') {
