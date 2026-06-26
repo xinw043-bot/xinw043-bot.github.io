@@ -203,26 +203,33 @@ async function sendToGoogleAds(row) {
 }
 
 // ==================== GA4 Measurement Protocol ====================
-// 🚨 修复点：提取到全局作用域，修复了之前的大括号嵌套语法错误
 async function sendToGA4(record, eventName = 'purchase') {
     const measurementId = process.env.GA4_MEASUREMENT_ID;
     const apiSecret = process.env.GA4_API_SECRET;
 
-    if (!measurementId || !apiSecret || !record.ga_client_id) {
-        return "⚠️ Skipped GA4: Missing Credentials or ClientID";
-    }
+    if (!measurementId || !apiSecret) return "❌ GA4 Error: Missing API Key";
+    if (!record.ga_client_id) return "⚠️ GA4 Skipped: No Client ID";
+
+    // --- 定义回执中显示的字段简写 ---
+    const sentFields = ['cid', 'tid']; // cid: client_id, tid: transaction_id
+    if (record.value) sentFields.push('val');
+    if (record.currency) sentFields.push('cur');
+    if (record.referrer_url) sentFields.push('src'); // src: source
+    
+    const cType = record.note ? record.note.split(' | ')[0] : 'Inquiry';
+    if (cType) sentFields.push('type'); // type: content_type
 
     const payload = {
-        client_id: record.ga_client_id, // 必须对应前端访客的 _ga cookie
+        client_id: record.ga_client_id, 
         events: [{
-            name: 'purchase',
+            name: eventName,
             params: {
                 transaction_id: record.inquiry_id || `ID_${record.id}`,
                 value: parseFloat(record.value || 0),
                 currency: (record.currency || 'USD').toUpperCase(),
                 engagement_time_msec: "100",
                 source: record.referrer_url || 'Direct',
-                content_type: record.note ? record.note.split(' | ')[0] : 'Inquiry'
+                content_type: cType
             }
         }]
     };
@@ -234,12 +241,13 @@ async function sendToGA4(record, eventName = 'purchase') {
             body: JSON.stringify(payload)
         });
         
+        // GA4 MP 成功通常返回 204 No Content
         if (response.status === 204 || response.status === 200) {
-            console.log(`✅ GA4 Success | Event: ${eventName} | ID: ${record.id}`);
-            return `✅ GA4:${eventName} Success`;
+            const successMsg = `✅ GA4:${eventName} | Sent: ${sentFields.join(', ')}`;
+            console.log(`✅ GA4 Success for ID ${record.id} → ${successMsg}`);
+            return successMsg; // 这个字符串会写入 google_data_api 字段
         } else {
-            const errText = await response.text();
-            return `❌ GA4 Error: ${response.status} ${errText}`;
+            return `❌ GA4 Error: ${response.status}`;
         }
     } catch (e) {
         return `❌ GA4 Failed: ${e.message}`;
